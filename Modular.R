@@ -3652,13 +3652,13 @@ if(TargetEIC_Only==TRUE) {
   Target_mzXML<-list.files(target_mzXML, pattern = ".mzXML", full.names = FALSE)
 }
 
-source(paste(InputLibrary,"/Scripts/EIC_MS1_fns.r",sep=""))
-source(paste(InputLibrary,"/Scripts/genEIC.r",sep=""))
-source(paste(InputLibrary,"/Scripts/genIsoTable.r",sep=""))
-source(paste(InputLibrary,"/Scripts/MS1Spectragen.r",sep=""))
-source(paste(InputLibrary,"/Scripts/IsotopePercentages.r",sep=""))
-source(paste(InputLibrary,"/Scripts/Kaufmann.r",sep=""))
-source(paste(InputLibrary,"/Scripts/Manual_Review.r",sep=""))
+source(paste(InputLibrary,"/Scripts/EIC_MS1_fns.R",sep=""))
+source(paste(InputLibrary,"/Scripts/genEIC.R",sep=""))
+source(paste(InputLibrary,"/Scripts/genIsoTable.R",sep=""))
+source(paste(InputLibrary,"/Scripts/MS1Spectragen.R",sep=""))
+source(paste(InputLibrary,"/Scripts/IsotopePercentages.R",sep=""))
+source(paste(InputLibrary,"/Scripts/Kaufmann.R",sep=""))
+source(paste(InputLibrary,"/Scripts/Manual_Review.R",sep=""))
 
 arguments = construct_EM_arguments(
     PrecursorMassAccuracy = PrecursorMassAccuracy

@@ -1,0 +1,23 @@
+Parameters,Values,Notes
+RT Window (for matching peaks to MS/MS scans),0.14,0.14 would be RT plus or minus 0.07 minute search window (can be seconds as well if that is what units are in)
+MZ Search Tolerance MS1 (Da),0.007,0.005 would be MZ plus or minus 0.005 Da search window
+MZ Search Window MS2 (ppm),30,10 would be MZ plus or minus 5 ppm search window
+Isolation Window (selection accuracy),1,amu or Da. 1 would be MZ plus or minus 0.5
+Minimum Scans for Fragment,1,Minimum number of scan with a fragment observed for that fragment to be considered real
+Intensity Threshold MS2,100,Necessary for a fragment mass to be considered real
+AIF minimum number of scans,5,Minimum number of scan with a fragment observed for that fragment to be considered real
+AIF correlation cutoff,0.6,Adjusted R2 correlation between precursors and fragments
+Comments Column (row ID. Should be numeric,1,Must be changed to match your data format
+MZ Column (in feature table),2,Must be changed to match your data format
+RT Column (in feature table),3,Must be changed to match your data format
+row numeric data starts (in feature table),2,Must be changed to match your data format
+Directory of Inputs,C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/RapidTest/Input/,Directory
+Directory of Libraries,C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/RapidTest/LipidMatch_Libraries/,Directory
+MS/MS intensity threshold (conversion),100,
+Intensity Threshold MS2,60,
+Scan Filter min,,
+Scan Filter max,,
+Directory of Grouping,,Directory of Groupings
+Directory of Sample Names,C:/Users/brook/Desktop/Groupings.csv,
+Directory of Sample Names,C:/Users/brook/Desktop/Groupings.csv,
+ISOstring,13C3;15N;33S;34S;Cl3;18O;Br3;29Si;30Si,"the isotopes that you can add for MS1 isotope labeling and isotope ratio calculations, if you don't differentiate the mass number it will use all from ""secondary_isotopes.csv"""
