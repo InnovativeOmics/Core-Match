@@ -38,8 +38,11 @@ Make sure to toggle the following parameters depending on your application, if b
 Make sure to follow all instructions for installing dependencies and package installation:
 
 LipidMatch-4.2\FluoroMatch_Flow_Manual.docx
+
 LipidMatch-4.2\FluoroMatch_Modular\FluoroMatch_Manual.docx
+
 LipidMatch-4.2\FluoroMatch_Modular\Trouble_Shooting_Common_Issues.docx
+
 If you have issues please contact Jeremy Koelmel at jeremykoelmel@gmail.com or open them up here on github
 
 ## To test the modular project
