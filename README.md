@@ -1,5 +1,6 @@
 # Core-Match
 Core scripts for LipidMatch, PolyMatch, and FluoroMatch
+
 For LipidMatch, FluoroMatch, and PolyMatch **users should directly download from innovativeomics.com/software** for the latest stable release.
 
 **Developers can edit the main algorithms here on github** as a team. Then the code needs to be integrated by placing the edited code in the correct directory from the downloaded distribution for innovativeomics.com, please contact us as well (jeremykoelmel@gmail.com) with major changes or project ideas, or discuss here.
