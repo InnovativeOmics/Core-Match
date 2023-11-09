@@ -14,6 +14,7 @@ csvInput <- TRUE
 ManuallyInputVariables <- FALSE
 RT_flagging <- TRUE #JPK: for PFAS analysis
 ParallelComputing <- TRUE
+HPC <- FALSE
 Lipid <- FALSE
 TWeen_pos <- FALSE #PJS: for PolyMatch
 FilterAbovePrecursor <- 1 #how far from the precursor should fragment masses be kept (e.g. if precursor is 700, should 702 be considered?)
@@ -43,9 +44,13 @@ if (ParallelComputing == TRUE) {
   library(foreach)
   if("doParallel" %in% rownames(installed.packages()) == FALSE) {install.packages("doParallel", repos = "http://cran.us.r-project.org")}
   library(doParallel)
-  DC <- as.numeric(detectCores())
+  library(parallelly)
+  DC <- as.numeric(availableCores())
   if (is.na(DC)) {
     DC <- makePSOCKcluster(4)
+    registerDoParallel(DC)
+  } else if (HPC == TRUE) {
+    DC <- makePSOCKcluster(DC)
     registerDoParallel(DC)
   } else if (DC <= 4) {
     DC <- makePSOCKcluster(DC)
