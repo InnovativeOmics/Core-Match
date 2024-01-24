@@ -15,7 +15,7 @@ ManuallyInputVariables <- FALSE
 RT_flagging <- TRUE #JPK: for PFAS analysis
 ParallelComputing <- TRUE
 Lipid <- FALSE
-TWeen_pos <- FALSE #PJS: for PolyMatch
+Tween_pos <- TRUE #PJS: for PolyMatch
 FilterAbovePrecursor <- 1 #how far from the precursor should fragment masses be kept (e.g. if precursor is 700, should 702 be considered?)
 TargetEIC_Only <- TRUE
 
@@ -168,7 +168,7 @@ if (ManuallyInputVariables==TRUE){
 }else if(csvInput == TRUE){
   ####################### Get input from csv VARIABLES SECTION ###############################
   #parametersDirectory
-  parametersDir <- "C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/RapidTest/"
+  parametersDir <- "C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/PolyMatch-4.3/Flow/LipidMatch_Distribution/"
   parametersFile <- paste(parametersDir, "PARAMETERS.csv", sep="")
   parametersInput_csv <- read.csv(parametersFile, sep=",", na.strings="NA", dec=".", strip.white=TRUE,header=FALSE)
   parametersInput_csv <- as.matrix(parametersInput_csv)
@@ -2177,7 +2177,7 @@ Scoring <- function (IDedTable_dir, OutDir, Mass_col, Retention_col, RowStartFor
   Frags_col <- 9 + Frags_col
   
   
-  if (Lipid == FALSE && TWeen_pos == FALSE) {
+  if (Lipid == FALSE && Tween_pos == FALSE) {
     IDedTable[, 1] <- IDedTable[, ncol_IDedTable - 6]
     IDedTable[, 2] <- paste(Names[as.numeric(IDedTable[, ncol_IDedTable - 3])], IDedTable[, ncol_IDedTable - 2], sep="_") ## Error??
     IDedTable[, 10] <- IDedTable[, ncol_IDedTable - 5]
@@ -2263,7 +2263,7 @@ Scoring <- function (IDedTable_dir, OutDir, Mass_col, Retention_col, RowStartFor
         IDedTable[i, 11] <- "No"
       }
     }
-  } else if (TWeen_pos == TRUE) {
+  } else if (Tween_pos == TRUE) {
     IDedTable[, 1] <- IDedTable[, ncol_IDedTable - 6]
     IDedTable[, 2] <- paste(Names[as.numeric(IDedTable[, ncol_IDedTable - 3])], IDedTable[, ncol_IDedTable - 2], sep="_") ## Error??
     IDedTable[, 10] <- IDedTable[, ncol_IDedTable - 5]
@@ -2779,7 +2779,7 @@ for(i in seq_len(lengthFoldersToRun)){
     cat(paste0("Reading in file:\t", FeatureTable_NEG,"\nFrom Directory:\t\t", FeatureTable_dir_in,"\n"))
     FeatureList_in <- ReadFeatureTable(FeatureTable_dir_in)
     # Create list of dataframes with all ms2 data
-
+    
     length_ddMS2NEG_in <- length(ddMS2NEG_in)
     MS2_df_list <- vector("list", length_ddMS2NEG_in)
     nrow_all_scans <- 0
@@ -2897,7 +2897,7 @@ for(i in seq_len(lengthFoldersToRun)){
     cat(paste0("Reading in file:\t", FeatureTable_POS,"\nFrom Directory:\t\t", FeatureTable_dir_in,"\n"))
     FeatureList_in <- ReadFeatureTable(FeatureTable_dir_in)
     # Create list of dataframes with all ms2 data
-
+    
     length_ddMS2POS_in <- length(ddMS2POS_in)
     MS2_df_list <- vector("list", length_ddMS2POS_in)
     nrow_all_scans <- 0
@@ -2966,11 +2966,11 @@ for(i in seq_len(lengthFoldersToRun)){
         }
       }
     }
-    print(paste("Finished Posative ddMS analysis", timestamp(), sep = " --> "))
+    print(paste("Finished Positive ddMS analysis", timestamp(), sep = " --> "))
     # Export MSMS combined file
     # write.csv(Pos_rawMSMS, file.path(InputDirectory, "Output/Pos_rawMSMS_Example2.csv"), row.names = FALSE, col.names = TRUE, na = "")
   }
-
+  
   
   #POS BY CLASS
   LibraryCriteria <- read.csv(LibCriteria) #Read-in Library ID criteria (csv) located in the LibrariesReducedAdducts folder
@@ -3012,7 +3012,7 @@ for(i in seq_len(lengthFoldersToRun)){
         }
       }
     }
-    print(paste("Finished Posative by class ddMS analysis", timestamp(), sep = " --> "))
+    print(paste("Finished Positive by class ddMS analysis", timestamp(), sep = " --> "))
     # Export MSMS combined file
     # write.csv(Pos_rawMSMS, file.path(InputDirectory, "Output/Pos_rawMSMS_Example3.csv"), row.names = FALSE, col.names = TRUE, na = "")
   }
@@ -3242,6 +3242,11 @@ for(i in seq_len(lengthFoldersToRun)){
   
   print(paste("Creating final MSMS export", timestamp(), sep = " --> "))
   
+  #for testing: 
+  #NegPosIDed_dir <- file.path(InputDirectory, "Output/PosIDed.csv")
+  #FeatureList_in_dir <- file.path(InputDirectory, "Output/PosIDed_FIN.csv")
+  #NegPos<-"Pos"
+  #final_MSMS_export(NegPosIDed_dir, FeatureList_in_dir, "Pos")
   final_MSMS_export <- function(NegPosIDed_dir, FeatureList_in_dir, NegPos) {
     #Mandatory Parameters
     #NEW PAUL, ALWAYS Frag_Annotations.csv, place in library folder (should always be there)
@@ -3251,6 +3256,8 @@ for(i in seq_len(lengthFoldersToRun)){
     if (NegPos == "Pos") {
       Frag_lib_dataFrame_file_directory <- file.path(InputLibrary, "Frag_Annotations_Pos.csv")
     }
+    
+    
     #PAUL: next 3 lines (including commented) MSMSFile, should be fixed / always the same?
     Frag_MZ_col <- 6
     MSMS_scan_RT_col <- 4
@@ -3316,12 +3323,22 @@ for(i in seq_len(lengthFoldersToRun)){
     
     FeatureList_in <- as.matrix(read.csv(FeatureList_in_dir, sep=",", na.strings="NA", dec=".", strip.white=TRUE, header=TRUE, check.names = FALSE))
     nrow_FeatureList_in <- nrow(FeatureList_in)
-    MZ_Append <- rev(as.numeric(FeatureList_in[, 6])) # Column should be constant (future error?)
-    RT_Append <- rev(as.numeric(FeatureList_in[, 7])) # Column should be constant
-    IDs_Append <- rev(as.numeric(FeatureList_in[, 12])) # Column should be constant
+    #columns in the feature table based on fixed names from prior portion, note the row ID does not have a fixed name!
+    MZcolAppend <- which( colnames(FeatureList_in)=="m/z")
+    if (length(MZcolAppend)==0) {
+      MZcolAppend <- which( colnames(FeatureList_in)=="m.z" )
+    }
+    RTcolAppend <- which( colnames(FeatureList_in)=="Retention Time")
+    if (length(RTcolAppend)==0) {
+      RTcolAppend <- which( colnames(FeatureList_in)=="Retention Time" )
+    }
+    MZ_Append <- as.numeric(FeatureList_in[, MZcolAppend]) # Column should be constant (future error?)
+    RT_Append <- as.numeric(FeatureList_in[, RTcolAppend]) # Column should be constant
+    IDs_Append <- as.numeric(FeatureList_in[, CommentColumn+11]) # Column should be constant
     Precursor_rawMSMS <- as.numeric(rawMSMS_df[, PrecursorMZCol_MSMS])
     RT_rawMSMS <- as.numeric(rawMSMS_df[, MSMS_scan_RT_col])
-    for (j in 2:nrow_FeatureList_in) { # Row should be constant (future error?)
+    #reverse because the last one is going to be the one that has an actual match and replace the others
+    for (j in nrow_FeatureList_in:RowStartForFeatureTableData) { # Row should be constant (future error?)
       ## Old, more nuanced approach
       
       # message(paste(j, "/", nrow_FeatureList_in, sep = ""))
@@ -3352,8 +3369,10 @@ for(i in seq_len(lengthFoldersToRun)){
       MZ_Append_current <- MZ_Append[j]
       RT_Append_current <- RT_Append[j]
       IDs_Append_current <- IDs_Append[j]
+      #calculate conditionals of whether or not a feature will have an associated MS/MS spectrum
       ppm_error <- ((Precursor_rawMSMS - MZ_Append_current)*10^6)/Precursor_rawMSMS
       MZ_Conditional <- abs(ppm_error)<(ppm_Window/2)
+      #if (length(MZ_Index)>0) {print(j)}
       MZ_Index <- which(MZ_Conditional==TRUE)
       RT_Conditional <- ((RT_Append_current - RT_Window/2) < RT_rawMSMS) & (RT_rawMSMS < (RT_Append_current + RT_Window/2))
       RT_Index <- which(RT_Conditional==TRUE)
@@ -3652,22 +3671,22 @@ if(TargetEIC_Only==TRUE) {
   Target_mzXML<-list.files(target_mzXML, pattern = ".mzXML", full.names = FALSE)
 }
 
-source(paste(InputLibrary,"/Scripts/EIC_MS1_fns.R",sep=""))
-source(paste(InputLibrary,"/Scripts/genEIC.R",sep=""))
-source(paste(InputLibrary,"/Scripts/genIsoTable.R",sep=""))
-source(paste(InputLibrary,"/Scripts/MS1Spectragen.R",sep=""))
-source(paste(InputLibrary,"/Scripts/IsotopePercentages.R",sep=""))
-source(paste(InputLibrary,"/Scripts/Kaufmann.R",sep=""))
-source(paste(InputLibrary,"/Scripts/Manual_Review.R",sep=""))
+source(paste(InputLibrary,"/Scripts/EIC_MS1_fns.r",sep=""))
+source(paste(InputLibrary,"/Scripts/genEIC.r",sep=""))
+source(paste(InputLibrary,"/Scripts/genIsoTable.r",sep=""))
+source(paste(InputLibrary,"/Scripts/MS1Spectragen.r",sep=""))
+source(paste(InputLibrary,"/Scripts/IsotopePercentages.r",sep=""))
+source(paste(InputLibrary,"/Scripts/Kaufmann.r",sep=""))
+source(paste(InputLibrary,"/Scripts/Manual_Review.r",sep=""))
 
 arguments = construct_EM_arguments(
-    PrecursorMassAccuracy = PrecursorMassAccuracy
-    ,RT_Window = RT_Window
-    ,OutputDirectory = OutputDirectory
-    ,FeatureID_Cols = c(7,8,1,5)
-    ,GroupCSVDirectory = GroupCSVDirectory
-    ,isostring = ISOstring
-    ,isotable = paste(InputLibrary,"/Scripts/secondary_isotopes.csv",sep="")
+  PrecursorMassAccuracy = PrecursorMassAccuracy
+  ,RT_Window = RT_Window
+  ,OutputDirectory = OutputDirectory
+  ,FeatureID_Cols = c(7,8,1,5)
+  ,GroupCSVDirectory = GroupCSVDirectory
+  ,isostring = ISOstring
+  ,isotable = paste(InputLibrary,"/Scripts/secondary_isotopes.csv",sep="")
 )
 arguments$path_to_mzXML_Files = target_mzXML
 
@@ -3681,14 +3700,15 @@ C13_col_name <- "13C1"
 if (runPosddMS) {
   outputFile<-DetermineFilePath("Pos")
   Kaufmann_eCs(outputFile,MD_col_name,MZ_col_name,C13_col_name)
-  print("Kaufmann plot inforation complete, positive mode")
+  print("Kaufmann plot information complete, positive mode")
   #Column Headers for Editing and Markup
   Review_Col_Names(outputFile)
 }
 if (runNegddMS) {
   outputFile<-DetermineFilePath("Neg")
   Kaufmann_eCs(outputFile,MD_col_name,MZ_col_name,C13_col_name)
-  print("Kaufmann plot inforation complete, negative mode")
+  print("Kaufmann plot information complete, negative mode")
   #Column Headers for Editing and Markup
   Review_Col_Names(outputFile)
 }
+
