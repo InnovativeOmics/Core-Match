@@ -118,6 +118,10 @@ if("mzR" %in% rownames(installed.packages()) == FALSE)  {
   BiocManager::install("mzR")}
 library(mzR)
 
+#define function to concatenate file paths and files together without issues due to presence of trailing slash in file path.
+file.join = function(..., sep = .Platform$file.sep){
+    gsub("//", "/", file.path(..., sep = sep))
+}
 
 if (ManuallyInputVariables==TRUE){
   
@@ -174,7 +178,7 @@ if (ManuallyInputVariables==TRUE){
   ####################### Get input from csv VARIABLES SECTION ###############################
   #parametersDirectory
   parametersDir <- "C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/RapidTest/"
-  parametersFile <- paste(parametersDir, "PARAMETERS.csv", sep="")
+  parametersFile <- file.join(parametersDir, "PARAMETERS.csv")
   parametersInput_csv <- read.csv(parametersFile, sep=",", na.strings="NA", dec=".", strip.white=TRUE,header=FALSE)
   parametersInput_csv <- as.matrix(parametersInput_csv)
   ErrorOutput<-0
