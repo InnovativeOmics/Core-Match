@@ -23,26 +23,14 @@ TargetEIC_Only <- TRUE
 #### END Mandatory Parameter to Change ####
 #### END "Read Me" Section ####
 
-#Force the directory for packages to be the one that is distributed not the local R directory
-if(length(.libPaths())>1){
-  R_DistrDir<-.libPaths()[2]
-  .libPaths(R_DistrDir)
-}
-
 if (FLOW == TRUE) {
   csvInput <- TRUE
   ManuallyInputVariables <- FALSE
 }
 
 
-#Checks for updates, installs packagaes: "installr" "stringr" "sqldf" "gWidgets" "gWidgetstcltk" and "compiler"
-# if(!require(installr)) {
-#   install.packages("installr"); install.packages("stringr"); require(installr)}
-# library(installr)
 if (ParallelComputing == TRUE) {
-  if("foreach" %in% rownames(installed.packages()) == FALSE) {install.packages("foreach", repos = "http://cran.us.r-project.org")}
   library(foreach)
-  if("doParallel" %in% rownames(installed.packages()) == FALSE) {install.packages("doParallel", repos = "http://cran.us.r-project.org")}
   library(doParallel)
   library(parallelly)
   DC <- as.numeric(availableCores())
@@ -59,33 +47,18 @@ if (ParallelComputing == TRUE) {
     DC <- makePSOCKcluster(DC-2)
     registerDoParallel(DC)
   }
-  # Force the directory for parallel computing to be the one that is distributed not the local R directory (doPar error)
-  clusterEvalQ(DC, .libPaths()[2])
 }
 
-if("tictoc" %in% rownames(installed.packages()) == FALSE) {install.packages("tictoc", repos = "http://cran.us.r-project.org")}
 library(tictoc)
 tic.clear()
 # tic("Main")
 
-if("sqldf" %in% rownames(installed.packages()) == FALSE) {install.packages("sqldf", repos = "http://cran.us.r-project.org")}
-if (!require("BiocManager", quietly = TRUE))install.packages("BiocManager", repos = "http://cran.us.r-project.org")
-
-
-#if("Rdisop" %in% rownames(installed.packages()) == FALSE) {install.packages("Rdisop", repos = "http://cran.us.r-project.org")}
-
-if("RSQLite" %in% rownames(installed.packages()) == FALSE) {install.packages("RSQLite", repos = "http://cran.us.r-project.org")}
-# if("gWidgets" %in% rownames(installed.packages()) == FALSE) {install.packages("gWidgets", repos = "http://cran.us.r-project.org")}
-# if("gWidgetstcltk" %in% rownames(installed.packages()) == FALSE) {install.packages("gWidgetstcltk", repos = "http://cran.us.r-project.org")}
-if("agricolae" %in% rownames(installed.packages()) == FALSE) {install.packages("agricolae", repos = "http://cran.us.r-project.org")}
 if (FLOW == FALSE && csvInput == FALSE && ManuallyInputVariables == FALSE) {
   require(gWidgets)
   require(gWidgetstcltk)
   options(guiToolkit="tcltk")
 }
 
-#library(Rdisop)
-#BiocManager::install("Rdisop")
 library(RSQLite)
 library(sqldf)
 library(agricolae)
@@ -108,14 +81,9 @@ errorBox <- function(message) {
   return()
 }
 
-if("data.table" %in% rownames(installed.packages()) == FALSE) {install.packages("data.table", repos = "http://cran.us.r-project.org")}
 library(data.table)
-if("SearchTrees" %in% rownames(installed.packages()) == FALSE) {install.packages("SearchTrees", repos = "http://cran.us.r-project.org")}
 library(SearchTrees)
-if("comprehenr" %in% rownames(installed.packages()) == FALSE) {install.packages("comprehenr", repos = "http://cran.us.r-project.org")}
 library(comprehenr)
-if("mzR" %in% rownames(installed.packages()) == FALSE)  {
-  BiocManager::install("mzR")}
 library(mzR)
 
 #define function to concatenate file paths and files together without issues due to presence of trailing slash in file path.
