@@ -114,10 +114,21 @@ extract_MS1 <- function( arguments ){
 
     arguments$fn_FeatureID_wpath = file.path(arguments$path_to_output_folder, arguments$fn_FeatureID)
     df_FeatureID <- readFeatureTable(arguments$fn_FeatureID_wpath, arguments$FeatureID_Cols, arguments$FeatureID_SkipRows)
-    df_FeatureID_mzrtid = df_FeatureID[,1:3]
-    df_FeatureID_formula = df_FeatureID[,4]
+    df_FeatureID_mzrtid = df_FeatureID[,1:(ncol(df_FeatureID)-1)]
+    df_FeatureID_formula = df_FeatureID[,ncol(df_FeatureID)]
     class(df_FeatureID_mzrtid) <- "numeric"
+
+    if("dt" %in% arguments$cols){
+        mzrtdt_ids = order(df_FeatureID_mzrtid[,4])
+        df_FeatureID_mzrtid = df_FeatureID_mzrtid[mzrtdt_ids,]
+        df_FeatureID_formula = df_FeatureID_formula[mzrtdt_ids]
+    }
+    mzrtdt_ids = order(df_FeatureID_mzrtid[,2])
+    df_FeatureID_mzrtid = df_FeatureID_mzrtid[mzrtdt_ids,]
+    df_FeatureID_formula = df_FeatureID_formula[mzrtdt_ids]
     df_FeatureID = list(df_FeatureID_mzrtid, df_FeatureID_formula)
+
+    print(df_FeatureID_mzrtid[1:20,])
 
     arguments$fn_MS1_output_wpath = file.path(arguments$path_to_output_folder, arguments$fn_MS1_output)
     if (!file.exists(arguments$fn_MS1_output_wpath)) {
@@ -128,8 +139,23 @@ extract_MS1 <- function( arguments ){
     arguments$mzZoomWindowLow  = min(arguments$Iso[[1]]) - 5
     arguments$mzZoomWindowHigh = max(arguments$Iso[[1]]) + 1
 
-    MS1s = getAllSpectras(arguments, AllIons, CEids$IDs[[minid]], isMS1=TRUE)
-    RTs = header(AllIons,CEids$IDs[[minid]])$retentionTime/60
+    MS1s = getAllSpectras(arguments, AllIons, CEids$IDs[[minid]][1:100000], isMS1=TRUE)
+    RTs = sort( unique( header(AllIons,CEids$IDs[[minid]])$retentionTime/60 ) )
+    RTw = (RTs[2] - RTs[1])/2
+    DTs = sort( unique( header(AllIons,CEids$IDs[[minid]])$ionMobilityDriftTime ) )
+    DTw = (DTs[2] - DTs[1])/2
 
-    calculateMS1s(arguments, MS1s, RTs, df_FeatureID)
+    print(MS1s[[516]])
+    print(MS1s[[563]])
+    print(MS1s[[596]])
+    print(MS1s[[647]])
+    print(MS1s[[673]])
+
+    isoIndices = order( arguments$Iso[[1]] )
+    arguments$Iso[[1]] = arguments$Iso[[1]][isoIndices]
+    arguments$Iso[[2]] = arguments$Iso[[2]][isoIndices]
+    arguments$Iso[[3]] = arguments$Iso[[3]][isoIndices]
+    test_ISO(MS1s, arguments$Iso, df_FeatureID, RTw, DTw, arguments$fn_MS1_output_wpath, arguments$fn_MS1_output)
+
+    # calculateMS1s(arguments, MS1s, RTs, df_FeatureID)
 }

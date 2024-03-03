@@ -28,7 +28,7 @@ construct_EM_arguments <- function(
             ,mztol = PrecursorMassAccuracy/2
             ,precision_mz = 5
             ,precision_rt = 2
-            ,precision_i = 0
+            ,precision_i = 3
             ,min_intensity = 1
             ,use_min_i_filter = FALSE
             ,cols = c("rt", "mz", "intensity", "pMz", "snum")
@@ -39,7 +39,7 @@ construct_EM_arguments <- function(
             ,toggle_frag_row = TRUE
             ,FeatureID_Cols = FeatureID_Cols # c(6,7,12) #mz, rt, rowID
             ,FeatureID_SkipRows = c() #c() means don't skip, c(1) means skip the first row
-            ,Min_EIC_Len = 3
+            ,Min_EIC_Len = 5
             ,AggFUN = max #min, mean, or max: sum will sum the mz and rt would need more code
             ,UseAgg = TRUE 
             # ,fn_ms2_output = "EXAMPLE_MS2_OUTPUT.ms2" # this is where the MS2 is stored using feature table
@@ -72,7 +72,7 @@ readFeatureTable <- function(fn, columns, skip){
     return(cols)
 }
 
-getSpectra <- function(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i){
+getSpectra <- function(arguments, PEAKS, IDs, rt, pMz, snum, imdt, i){
     # makes a mini matrix of the spectra
     IDi = IDs[i]
     p = PEAKS[[i]]
@@ -83,8 +83,9 @@ getSpectra <- function(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i){
     m = matrix(nrow = nrow(p), ncol = length(arguments$cols))
     m[,1] = rt[i]
     m[,2:3] = p
-    m[,4] = pMz[i]
-    m[,5] = snum[i]
+    # m[,4] = pMz[i]
+    # m[,5] = snum[i]
+    if("dt" %in% arguments$cols){ m[,4] = imdt[i] } # Ion Mobility Drift Time
     # If needed, set extra column data
     colnames(m) = arguments$cols
     return(m)
@@ -98,9 +99,15 @@ getAllSpectras <- function(arguments, AllIons, IDs, isMS1=FALSE){
     rt = data$retentionTime/60 
     pMz = data$precursorMZ #get precursorMZ
     snum = data$acquisitionNum #get acquisition number (scan num)
+    if("dt" %in% arguments$cols){ 
+        # Ion Mobility Drift Time
+        imdt = data$ionMobilityDriftTime
+    } else{
+        imdt = NULL
+    }
 
-    # print(paste("length of CE processing: ",length(IDs)))
-    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i))
+    print(paste("length of CE processing: ",length(IDs)))
+    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, PEAKS, IDs, rt, pMz, snum, imdt, i))
     M = do.call(rbind, MS)
     if(isMS1){return(MS)}
     return(M)
