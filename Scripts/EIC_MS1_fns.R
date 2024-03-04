@@ -31,7 +31,7 @@ construct_EM_arguments <- function(
             ,precision_i = 3
             ,min_intensity = 1
             ,use_min_i_filter = FALSE
-            ,cols = c("rt", "mz", "intensity", "pMz", "snum")
+            ,cols = c("rt", "mz", "intensity")
             ,FeatureID_SkipRows = c()
 
         # Some
@@ -72,7 +72,7 @@ readFeatureTable <- function(fn, columns, skip){
     return(cols)
 }
 
-getSpectra <- function(arguments, PEAKS, IDs, rt, pMz, snum, imdt, i){
+getSpectra <- function(arguments, PEAKS, IDs, rt, imdt, i){
     # makes a mini matrix of the spectra
     IDi = IDs[i]
     p = PEAKS[[i]]
@@ -93,12 +93,11 @@ getSpectra <- function(arguments, PEAKS, IDs, rt, pMz, snum, imdt, i){
 
 getAllSpectras <- function(arguments, AllIons, IDs, isMS1=FALSE){
     # creates matrix for all scans for a particular CE
-    end = length(AllIons)
     PEAKS = lapply(seq_along(IDs), function(i) peaks(AllIons, IDs[i]))
     data = header(AllIons,IDs)
-    rt = data$retentionTime/60 
-    pMz = data$precursorMZ #get precursorMZ
-    snum = data$acquisitionNum #get acquisition number (scan num)
+    rt = data$retentionTime/60 # retention times in minutes
+    # pMz = data$precursorMZ #get precursorMZ
+    # snum = data$acquisitionNum #get acquisition number (scan num)
     if("dt" %in% arguments$cols){ 
         # Ion Mobility Drift Time
         imdt = data$ionMobilityDriftTime
@@ -107,7 +106,7 @@ getAllSpectras <- function(arguments, AllIons, IDs, isMS1=FALSE){
     }
 
     print(paste("length of CE processing: ",length(IDs)))
-    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, PEAKS, IDs, rt, pMz, snum, imdt, i))
+    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, PEAKS, IDs, rt, imdt, i))
     M = do.call(rbind, MS)
     if(isMS1){return(MS)}
     return(M)
