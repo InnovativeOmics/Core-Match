@@ -14,14 +14,27 @@ test_MS1 <- function(){
         ,isostring = "13C3;N;S;Cl2;18O;Br2"
         ,isotable = "../Scripts/secondary_isotopes.csv"
     )
-    args$dttol = c(0.3, 4.0)
-    args$rttol = c(0.1, 1.0)
+    args$dttol = 3
+    args$rttol = 0.1
     args$cols = c("rt", "mz", "intensity", "dt")
     args$fn_FeatureID = "CM_PFAS_Level6_IM4_bit_DI3_d_DeMP_FIN.csv"
-    args$fn_mzxml = "CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
-    args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT.csv"
-    args$path_to_mzXML_Files = "../../../datafiles/"
-    extract_MS1(args)
+
+    fn_mzxmls = list("CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
+        , "NoParameters_Uncompressed_CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
+        , "PeakPicking_CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
+        , "PeakPicking_CWT_CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
+        , "PeakPickingUncompressed_CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
+    )
+
+    # args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT.csv"
+    for(i in 1:length(fn_mzxmls)){
+        args$path_to_mzXML_Files = if(i == 1) "../../../datafiles/" else "../../../datafiles/newones"
+        args$fn_mzxml = fn_mzxmls[[i]]
+        args$fn_MS1_output = paste("MS1_Ion_Mobility_", args$fn_mzxml, ".csv", sep="")
+        print(args$fn_mzxml)
+        print(args$fn_MS1_output)
+        extract_MS1(args)
+    }
 }
 
 test_MS1()

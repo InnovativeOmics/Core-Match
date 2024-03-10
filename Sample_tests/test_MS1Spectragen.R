@@ -14,6 +14,7 @@ test_MS1 <- function(){
         ,isostring = "13C3;N;S;Cl2;18O;Br2"
         ,isotable = "../Scripts/secondary_isotopes.csv"
     )
+    args$dttol = 3
     args$cols = c("rt", "mz", "intensity")
     args$fn_FeatureID = "NegIDed_FIN.csv"
     args$fn_mzxml = "AFFF3_Target_Neg.mzXML"

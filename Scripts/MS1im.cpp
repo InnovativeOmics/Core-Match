@@ -14,12 +14,20 @@
 #include <Rcpp.h>
 
 // mz, intensities, isotope strings, formulas, ft id
-struct datatable {
+struct scantable {
   std::vector< float > mzs; //mass to charge ratios from scan
+  std::vector< float > rts; //mass to charge ratios from scan
+  std::vector< float > dts; //mass to charge ratios from scan
   std::vector< float > its; //intensity values from scan
   std::vector< std::string > isos; //isotopes any isotopes less than mztol
   std::vector< std::string > formulas; //formula (if any) for closest mass
   int tid; //target feature table row ID
+  int scanid;
+  int scanrows;
+  int originalid;
+  float tmz;
+  float trt;
+  float tdt;
 };
 
 // convert float to string with target precision (number of decimals)
@@ -71,7 +79,7 @@ std::string get_iso_string(
   return s;
 }
 
-datatable process_scan_ft(
+scantable process_scan_ft(
     std::vector<float> rm,
     std::vector<std::string> sym,
     std::vector<float> comp,
@@ -83,7 +91,7 @@ datatable process_scan_ft(
     float mztol
   ){
   // create structure to store data
-  struct datatable t;
+  struct scantable t;
 
   float min_dmz = 10000.0; // store the closest match to the target mz
   int min_dmz_id = 0;      // store the index of closest match
@@ -92,11 +100,15 @@ datatable process_scan_ft(
   {
     float mz = scan(i, 1);
     float it = scan(i, 2);
+    float rt = scan(i, 0);
+    float dt = scan.ncol() == 4 ? scan(i, 3) : 0.0;
     // get everything that's within the mz window and has a non zero intensity
-    if( (mz + mzWindowLow < tmz) && (tmz < mz + mzWindowHigh) && (0 < it) )
+    if( (tmz + mzWindowLow < mz) && (mz < tmz + mzWindowHigh) && (0 < it) )
     {
       t.mzs.push_back( mz );
       t.its.push_back( it );
+      t.rts.push_back( rt );
+      t.dts.push_back( dt );
       dmzs.push_back( std::abs(tmz - mz) );
       // get the minimum id to set "M"
       if( dmzs.back() < min_dmz ){
@@ -120,12 +132,13 @@ datatable process_scan_ft(
   }
 
   // it's possible that "M" isn't close enough, so skip reporting this feature table 
-  struct datatable emptytable;
-  return min_dmz < mztol ? t : emptytable;
+  // struct scantable emptytable;
+  // return min_dmz < mztol ? t : emptytable;
+  return t;
 }
 
 void print_tables(
-    std::vector< datatable > tables,
+    std::vector< scantable > tables,
     std::string filenameOutput,
     std::string filenameSource
   ){
@@ -143,77 +156,174 @@ void print_tables(
       out << tables[i].formulas[j]   << ",";
       out <<  ""  << ",";
       out << filenameSource << std::endl;
+
+      // out << std::to_string(tables[i].tid) << ",";
+      // out << std::to_string(tables[i].scanid) << ",";
+      // out << std::to_string(tables[i].scanrows) << ",";
+      // out << std::to_string(tables[i].originalid) << ",";
+      // out << tos(tables[i].mzs[j],5) << ",";
+      // out << tos(tables[i].tmz,4) << ",";
+      // out << tos(tables[i].rts[j],5) << ",";
+      // out << tos(tables[i].trt,4) << ",";
+      // out << tos(tables[i].dts[j],5) << ",";
+      // out << tos(tables[i].tdt,4) << ",";
+      // out << tos(tables[i].its[j],3) << ",";
+      // out << tables[i].isos[j]       << ",";
+      // out << tables[i].formulas[j]   << ",";
+      // out <<  ""  << ",";
+      // out << filenameSource << std::endl;
     }
   }
   out.close();
 }
 
-// [[Rcpp::export]]
-void save_MS1s_to_file(
+
+std::vector<int> get_closest_scan_ids(
     Rcpp::List scans, 
-    Rcpp::List FT,
+    Rcpp::NumericMatrix ft,
+    float rttol,
+    bool hasdt
+  ){
+
+  std::vector<float> rtdt_dist;
+  std::vector<int> closest_scan_ids;
+  for (int i = 0; i < ft.nrow(); i++) {
+    rtdt_dist.push_back(1000000.0); // store the minimum rtdt distance
+    closest_scan_ids.push_back(0); // store the '' index
+  }
+
+  int ftidx = 0;
+  // traverse through every scan in the dataset
+  for(int scanid = 0; scanid < scans.size(); scanid++){
+    Rcpp::NumericMatrix scan = scans[scanid];
+    float scan_rt = scan(0,0);
+    float scan_dt = hasdt ? scan(0,3) : 0.0;
+
+    // go through feature table within retention time tolerance
+    for (int i = ftidx; i < ft.nrow(); i++) {
+      float trt = ft(i, 1);
+      float tdt = ft.ncol() == 4 ? ft(i, 3) : 0.0;
+
+      // possibly skip to (next scan | FT row)
+      // This is so that we can skip over rows in either dataset
+      if( scan_rt + rttol < trt ){ break; }
+      if( trt < scan_rt - rttol ){ ftidx++; continue; }
+
+      float drt = std::abs(trt - scan_rt);
+      float ddt = hasdt ? std::abs(tdt - scan_dt) : 0.0;
+      if( drt + ddt < rtdt_dist[i] ){
+        rtdt_dist[i] = drt + ddt;
+        closest_scan_ids[i] = scanid;
+      }
+    }
+  }
+
+  return closest_scan_ids;
+}
+
+std::vector<scantable> get_MS1_tables(
     Rcpp::List Iso,
-    float rtw,
-    float dtw,
-    std::string filenameOutput,
-    std::string filenameSource,
+    Rcpp::List scans,
+    std::vector<int> closest_scan_ids,
+    std::vector<int> mzrtdt_ids,
+    Rcpp::NumericMatrix ft,
+    std::vector<std::string> ft_formulas,
     float mzWindowLow,
     float mzWindowHigh,
     float mztol,
+    float rttol,
+    float dttol,
     bool hasdt
+  ){
+
+  std::vector<float> rm = Iso[0]; // relative masses
+  std::vector<std::string> sym = Iso[1]; // symbols (ex: 13C1)
+  std::vector<float> comp = Iso[2]; // composition/abundance, % found from generic sample ex:1.08%
+
+  std::vector<scantable> MS1tables;
+  for (int i = 0; i < ft.nrow(); i++) {
+    int scanid = closest_scan_ids[i];
+    Rcpp::NumericMatrix scan = scans[scanid];
+    float scan_rt = scan(0,0);
+    float scan_dt = hasdt ? scan(0,3) : 0.0;
+
+    float tmz = ft(i, 0);
+    float trt = ft(i, 1);
+    int   tid = ft(i, 2);
+    float tdt = ft.ncol() == 4 ? ft(i, 3) : 0.0;
+    std::string tformula = ft_formulas[i];
+
+    // rt (and dt) is within the tolerance, create an MS1 table
+    // also support datasets which don't have drift time (non Ion Mobility)
+    float rtbool = std::abs(trt - scan_rt) < rttol;
+    float dtbool = hasdt ? std::abs(tdt - scan_dt) < dttol : true;
+
+    // std::cout << "Processing feature " << i << " " << std::abs(trt - scan_rt) + std::abs(tdt - scan_dt) << std::endl;
+
+    if( rtbool && dtbool){
+      struct scantable table_i = process_scan_ft(rm, sym, comp, scan, tmz
+                                  , tformula, mzWindowLow, mzWindowHigh, mztol);
+      table_i.tmz = tmz;
+      table_i.trt = trt;
+      table_i.tdt = tdt;
+      table_i.tid = tid;
+      table_i.scanid = scanid;
+      table_i.scanrows = scan.nrow();
+      table_i.originalid = mzrtdt_ids[i];
+      MS1tables.push_back( table_i );
+    }
+  }
+
+  std::sort( begin(MS1tables), end(MS1tables), [&](scantable a, scantable b){ 
+      return a.originalid < b.originalid;
+    });
+
+  return MS1tables;
+}
+
+// [[Rcpp::export]]
+void save_MS1s_to_file(
+    Rcpp::List Iso,
+    Rcpp::List scans, 
+    Rcpp::List FT,
+    std::vector<int> mzrtdt_ids,
+    float mzWindowLow,
+    float mzWindowHigh,
+    float mztol,
+    float rttol,
+    float dttol,
+    bool hasdt,
+    std::string filenameOutput,
+    std::string filenameSource
   ){
   /*
     Inputs:
     scans - scan data in data frames sorted by RT and then DT
     FT    - feature table (data matrix, formulas)
     Iso   - isotopes, relative masses, symbols, compositions
-    rtw   - retention time window
-    dtw   - drift time window
+    mzrtdt_ids - the indices which correspond to the feature table
+    mztol - mass to charge tolerance (if there's not an mz within this, skip the feature table)
+    rttol - retention time tolerance
+    dttol - drift time tolerance
     filenameOutput - the destination where data will be saved
     filenameSource - the sourse where the scan data came from
     mzWindowLow  - how much lower than target mz can be considered
     mzWindowHigh - how much higher than target mz can be considered
-    mztol - mass to charge tolerance (if there's not an mz within this, skip the feature table)
     hasdt - allow this to proces data with(out) drift time
   */
 
   // unpack variables
   Rcpp::NumericMatrix ft = FT[0]; // mz, rt, id, dt(?)
-  std::vector<std::string> ft_formula = FT[1]; // formulas from feature table
-  std::vector<float> rm = Iso[0]; // relative masses
-  std::vector<std::string> sym = Iso[1]; // symbols (ex: 13C1)
-  std::vector<float> comp = Iso[2]; // composition/abundance, % found from generic sample ex:1.08%
+  std::vector<std::string> ft_formulas = FT[1]; // formulas from feature table
 
-  int ftidx = 0;
-  std::vector<datatable> tables;
-  for(int scanid = 0; scanid < scans.size(); scanid++){
-    // traverse through every scan in the dataset
-    Rcpp::NumericMatrix scan = scans[scanid];
-    float scan_rt = scan(0,0);
+  // Get the indices for which scan is closest in drt + ddt to the feature rows
+  // This represents where the sum of the retention and drift time differences is minimized
+  std::vector<int> closest_scan_ids = get_closest_scan_ids(scans, ft, rttol, hasdt);
 
-    // go through a matching window where feature table retention time is close
-    for (int i = ftidx; i < ft.nrow(); i++) {
-      float trt = ft(i, 1);
+  // once we have the closest scans,
+  //   we can just directly access and process these from the scan data
+  std::vector<scantable> MS1tables = get_MS1_tables(Iso, scans, closest_scan_ids, mzrtdt_ids,
+    ft, ft_formulas, mzWindowLow, mzWindowHigh, mztol, rttol, dttol, hasdt);
 
-      // possibly skip to (next scan | FT row)
-      if( scan_rt + rtw < trt ){ break; }
-      if( trt < scan_rt - rtw ){ ftidx++; continue; }
-
-      float tmz = ft(i, 0);
-      float tid = ft(i, 2);
-      float tdt = ft.ncol() == 4 ? ft(i, 3) : 0.0;
-      bool dtbool = hasdt ? ((scan(0,3) - dtw < tdt) && (tdt < scan(0,3) + dtw)) : true;
-      std::string tformula = ft_formula[i];
-      // rt (and dt) is in the window, create an MS1 table
-      if( (scan_rt - rtw < trt) && (trt < scan_rt + rtw) && dtbool){
-        struct datatable table_i = process_scan_ft(rm, sym, comp, scan, tmz
-                                    , tformula, mzWindowLow, mzWindowHigh, mztol);
-        table_i.tid = tid;
-        tables.push_back( table_i );
-        ftidx++;
-      }
-    }
-  }
-
-  print_tables(tables, filenameOutput, filenameSource);
+  print_tables(MS1tables, filenameOutput, filenameSource);
 }
