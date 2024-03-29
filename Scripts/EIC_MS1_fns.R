@@ -7,12 +7,14 @@ library(mzR)
 
 construct_EM_arguments <- function(
     PrecursorMassAccuracy = PrecursorMassAccuracy
-    ,RT_Window = RT_Window
+    ,RT_Tolerances = RT_Tolerances
+    ,DT_Tolerances = DT_Tolerances
     ,OutputDirectory = OutputDirectory
     ,FeatureID_Cols = FeatureID_Cols
     ,GroupCSVDirectory = GroupCSVDirectory
     ,isostring = ISOstring
     ,isotable = isotable 
+    ,isIM = isIM
 ){
     # Commented items need to be defined for those algorithms.
     arguments = list(
@@ -31,31 +33,28 @@ construct_EM_arguments <- function(
             ,precision_i = 3
             ,min_intensity = 1
             ,use_min_i_filter = FALSE
-            ,cols = c("rt", "mz", "intensity")
             ,FeatureID_SkipRows = c()
+            ,rttol = RT_Tolerances
+            ,dttol = DT_Tolerances
 
-        # Some
-            ,ncols = 5
+        # Some=
             ,toggle_frag_row = TRUE
             ,FeatureID_Cols = FeatureID_Cols # c(6,7,12) #mz, rt, rowID
             ,FeatureID_SkipRows = c() #c() means don't skip, c(1) means skip the first row
             ,Min_EIC_Len = 5
             ,AggFUN = max #min, mean, or max: sum will sum the mz and rt would need more code
             ,UseAgg = TRUE 
-            # ,fn_ms2_output = "EXAMPLE_MS2_OUTPUT.ms2" # this is where the MS2 is stored using feature table
-
-        # MS1
-            # ,mzZoomWindow = 5 #now based on max RelativeMass
-            # ,FeatureID_Cols = c(6,7,12,4) #mz, rt, rowID, formula
-            # ,fn_MS1_output = "EXAMPLE_MS1_OUTPUT.csv" # this is where the MS1 is stored using feature table
-
-        # EIC
-            ,rttol = (RT_Window/2) * 6
-            # ,fn_eic_output = "EXAMPLE_EIC_OUTPUT.csv" # this is where the EIC is stored using feature table
-            # ,fn_csv_output = "EXAMPLE_CSV_OUTPUT.csv" # this is converted from mzxml data
+            ,isIM = isIM
     )
     if (length(GroupCSVDirectory)>0) { 
         arguments$FeatureID_SkipRows = c(1)
+    }
+    if(isIM){
+        arguments$cols = c("rt", "mz", "intensity", "dt")
+        arguments$colheader = c("Feature","MZ","RT","DT","Intensity","File")
+    } else {
+        arguments$cols = c("rt", "mz", "intensity")
+        arguments$colheader = c("Feature", "MZ", "RT", "Intensity", "File")
     }
     return(arguments)
 }

@@ -11,7 +11,7 @@ printEICs <- function(arguments, EIC_FeatureID, df_FeatureID, FeatureID_row){
     EIC_FeatureID[,5] = arguments$fn_mzxml
     EIC_FeatureID = cbind(EIC_FeatureID, 1)
 
-    colnames(EIC_FeatureID) = c("RT", "mz", "Intensity", "Feature", "File")
+    colnames(EIC_FeatureID) = c("RT", "MZ", "Intensity", "Feature", "File")
     write.table(EIC_FeatureID[,arguments$colheader]
         , file = arguments$fn_eic_output_wpath, row.names = FALSE, quote = FALSE
         , col.names = FALSE, append = TRUE, sep = ",")
@@ -22,7 +22,7 @@ calculateEICs <- function(arguments, CEs, RTs, trees, df_FeatureID){
     # write EIC data to file
     for(FeatureID_row in 1:nrow(df_FeatureID)){
         # print(FeatureID_row)
-        result = generateEICforFeatureID(CEs, RTs, trees, df_FeatureID, FeatureID_row, arguments$mztol, arguments$rttol)
+        result = generateEICforFeatureID(CEs, RTs, trees, df_FeatureID, FeatureID_row, arguments$mztol, arguments$rttol[2])
         EIC_FeatureID = result[[2]]
 
         # when Min_EIC_Len is 1, skips printing when there is only one row
