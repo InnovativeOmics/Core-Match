@@ -47,10 +47,9 @@ extract_MS1 <- function( arguments ){
 
     MS1s = getAllSpectras(arguments, AllIons, CEids$IDs[[minid]], isMS1=TRUE)
 
-    hasdt = "dt" %in% arguments$cols
     save_MS1s_to_file(arguments$Iso, MS1s, df_FeatureID, mzrtdt_ids
     , mzZoomWindowLow, mzZoomWindowHigh
-    , arguments$mztol, arguments$rttol[1], arguments$dttol[2], hasdt
+    , arguments$mztol, arguments$rttol[1], arguments$dttol[2], arguments$isIM
     , arguments$fn_MS1_output_wpath, arguments$fn_mzxml
     )
 

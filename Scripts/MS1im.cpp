@@ -182,17 +182,21 @@ std::vector<int> get_closest_scan_ids(
     Rcpp::List scans, 
     Rcpp::NumericMatrix ft,
     float rttol,
+    float dttol,
     bool hasdt
   ){
 
-  std::vector<float> rtdt_dist;
+  std::vector<float> closest_scan_rts;
+  std::vector<float> closest_scan_dts;
   std::vector<int> closest_scan_ids;
   for (int i = 0; i < ft.nrow(); i++) {
-    rtdt_dist.push_back(1000000.0); // store the minimum rtdt distance
+    closest_scan_rts.push_back(0.0); // store the closest rt
+    closest_scan_dts.push_back(0.0); // store the closest dt
     closest_scan_ids.push_back(0); // store the '' index
   }
 
   int ftidx = 0;
+  float ep = 0.0001; //account for fp error
   // traverse through every scan in the dataset
   for(int scanid = 0; scanid < scans.size(); scanid++){
     Rcpp::NumericMatrix scan = scans[scanid];
@@ -202,21 +206,42 @@ std::vector<int> get_closest_scan_ids(
     // go through feature table within retention time tolerance
     for (int i = ftidx; i < ft.nrow(); i++) {
       float trt = ft(i, 1);
-      float tdt = ft.ncol() == 4 ? ft(i, 3) : 0.0;
+      float tdt = hasdt ? ft(i, 3) : 0.0;
 
       // possibly skip to (next scan | FT row)
       // This is so that we can skip over rows in either dataset
-      if( scan_rt + rttol < trt ){ break; }
-      if( trt < scan_rt - rttol ){ ftidx++; continue; }
+      if( scan_rt + rttol < trt ){ break; } // scan's rt isn't high enough
+      if( trt < scan_rt - rttol ){ ftidx++; continue; } //scan's rt is too high, try next feature
 
-      float drt = std::abs(trt - scan_rt);
-      float ddt = hasdt ? std::abs(tdt - scan_dt) : 0.0;
-      if( drt + ddt < rtdt_dist[i] ){
-        rtdt_dist[i] = drt + ddt;
-        closest_scan_ids[i] = scanid;
+      // get the distance to current retention time and closest rt (so far)
+      float drt_scan = std::abs(trt - scan_rt);
+      float drt_best = std::abs(trt - closest_scan_rts[i]);
+      // enter if at new best rt
+      if( drt_scan + ep < drt_best ){
+        closest_scan_rts[i] = scan_rt;
+        // set closest if it's not a drift time id
+        if(!hasdt){
+          closest_scan_ids[i] = scanid;
+        }
+        // std::cout << ft(i, 2) << ",  " << scanid << ",  " << tos(closest_scan_rts[i],4) << ",  " << tos(closest_scan_dts[i],4) << std::endl;
+      }
+
+      // enter if at current closest rt (within epsilon)
+      if( drt_scan < drt_best + ep && hasdt ){
+        float ddt_scan = std::abs(tdt - scan_dt);
+        float ddt_best = std::abs(tdt - closest_scan_dts[i]);
+        // enter if at current closest dt
+        if( ddt_scan < ddt_best && ddt_scan < dttol ){
+          closest_scan_dts[i] = scan_dt;
+          closest_scan_ids[i] = scanid;
+        }
       }
     }
   }
+
+  // for (int i = 0; i < ft.nrow(); i++) {
+  //   std::cout << ft(i, 2) << ",  " << closest_scan_ids[i] << ",  " << tos(closest_scan_rts[i],4) << ",  " << tos(closest_scan_dts[i],4) << std::endl;
+  // }
 
   return closest_scan_ids;
 }
@@ -318,7 +343,7 @@ void save_MS1s_to_file(
 
   // Get the indices for which scan is closest in drt + ddt to the feature rows
   // This represents where the sum of the retention and drift time differences is minimized
-  std::vector<int> closest_scan_ids = get_closest_scan_ids(scans, ft, rttol, hasdt);
+  std::vector<int> closest_scan_ids = get_closest_scan_ids(scans, ft, rttol, dttol, hasdt);
 
   // once we have the closest scans,
   //   we can just directly access and process these from the scan data

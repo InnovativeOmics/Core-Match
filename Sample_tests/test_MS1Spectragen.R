@@ -18,7 +18,7 @@ test_MS1 <- function(){
     )
     args$fn_FeatureID = "NegIDed_FIN.csv"
     args$fn_mzxml = "AFFF3_Target_Neg.mzXML"
-    args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_NEW.csv"
+    args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_NEW2.csv"
     args$path_to_mzXML_Files = "../RapidTestModular_FM/Input"
     extract_MS1(args)
 }

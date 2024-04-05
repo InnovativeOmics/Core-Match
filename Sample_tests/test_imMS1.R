@@ -17,6 +17,7 @@ test_MS1 <- function(){
         ,isIM = TRUE
     )
     args$fn_FeatureID = "CM_PFAS_Level6_IM4_bit_DI3_d_DeMP_FIN.csv"
+    # args$fn_FeatureID = "CM_PFAS_Level6_IM4_bit_DI3_d_DeMP_FIN_small.csv"
 
     fn_mzxmls = list("CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
         , "NoParameters_Uncompressed_CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
@@ -30,7 +31,7 @@ test_MS1 <- function(){
     # for(i in 1:length(fn_mzxmls)){
         args$path_to_mzXML_Files = if(i == 1) "../../../datafiles/" else "../../../datafiles/newones"
         args$fn_mzxml = fn_mzxmls[[i]]
-        args$fn_MS1_output = paste("MS1_Ion_Mobility_", args$fn_mzxml, "NEW.csv", sep="")
+        args$fn_MS1_output = paste("MS1_Ion_Mobility_", args$fn_mzxml, "NEW-modified.csv", sep="")
         print(args$fn_mzxml)
         print(args$fn_MS1_output)
         extract_MS1(args)
