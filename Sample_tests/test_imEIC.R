@@ -17,7 +17,7 @@ test_eic_im <- function(){
     )
     args$fn_FeatureID = "CM_PFAS_Level6_IM4_bit_DI3_d_DeMP_FIN.csv"
     args$fn_mzxml = "CM PFAS Level 6 IM 4 bit_DI3.d.DeMP.mzML"
-    args$fn_eic_output = "EXAMPLE_EIC_IM_OUTPUT_NEW.csv"
+    args$fn_eic_output = "EXAMPLE_EIC_IM_OUTPUT_NEW-modified.csv"
     args$path_to_mzXML_Files = "../../../datafiles/"
     extract_EICs(args)
 }
