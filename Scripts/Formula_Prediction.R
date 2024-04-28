@@ -217,7 +217,7 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
           rm(MFList1,MFList2) #Trash
         }else{ MFList <- MFList1}
         
-        if(nrow(MFList)==0){MFList <- NULL}
+        if(length(MFList)==0) {MFList <- NULL} else if (nrow(MFList)==0) {MFList <- NULL}
         
         # Deduplication, Senior Filter, NRule Filter
         while(!is.null(MFList) && MFEscape==F){
@@ -1466,7 +1466,8 @@ consolidateMF2 <- function (x) {
   #E <- c('Ga','Te','Ge','Sn')
   #target[E] <- rep(0,length(E))
   matched <- match(names(x), names(target))
-  if (!any(duplicated(names(x)))) {
+  matched<-matched[!is.na(matched)]
+  if (!any(duplicated(names(x)))&(sum(is.na(matched))<1)) {
     target[matched] <- x
   }
   else {
