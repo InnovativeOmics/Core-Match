@@ -15,11 +15,13 @@ construct_EM_arguments <- function(
     ,isostring = ISOstring
     ,isotable = isotable 
     ,isIM = isIM
+    ,path_to_mzXML_Files
 ){
     # Commented items need to be defined for those algorithms.
     arguments = list(
         #USER
-            path_to_output_folder = OutputDirectory
+      path_to_mzXML_Files = path_to_mzXML_Files
+            ,path_to_output_folder = OutputDirectory
             # ,fn_mzxml = ""
             # ,fn_FeatureID = "NegIDed_FIN.csv"
             # ,isostring = "13C5;N;S;Cl4;18O;Br2"
