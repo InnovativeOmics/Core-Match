@@ -14,14 +14,22 @@ csvInput <- TRUE
 ManuallyInputVariables <- FALSE
 RT_flagging <- TRUE #JPK: for PFAS analysis
 ParallelComputing <- TRUE
-HPC <- FALSE
 Lipid <- FALSE
 TWeen_pos <- FALSE #PJS: for PolyMatch
 FilterAbovePrecursor <- 1 #how far from the precursor should fragment masses be kept (e.g. if precursor is 700, should 702 be considered?)
 TargetEIC_Only <- TRUE
+alignMS2_ppm <- FALSE #selection accuracy will be divided by 4, eg. 1 Da Window = +/- 0.25 difference, if FALSE, Otherwise the mass accuracy in ppm will be used to align MSMS scans to the feature table
 
 #### END Mandatory Parameter to Change ####
 #### END "Read Me" Section ####
+
+#Force the directory for packages to be the one that is distributed not the local R directory
+if(length(.libPaths())>1){
+  R_DistrDir<-.libPaths()[2]
+  .libPaths(R_DistrDir)
+}
+#Or just force .libPaths()
+# .libPaths("C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/FluoroMatch-4.4_GitHub/Flow/R-4.2.1/library/")
 
 if (FLOW == TRUE) {
   csvInput <- TRUE
@@ -29,16 +37,30 @@ if (FLOW == TRUE) {
 }
 
 
+#Checks for updates, installs packagaes: "installr" "stringr" "sqldf" "gWidgets" "gWidgetstcltk" and "compiler"
+# if(!require(installr)) {
+#   install.packages("installr"); install.packages("stringr"); require(installr)}
+# library(installr)
+
+#These are distributed by us (thanks Jonathan)
+#cannot installed online
+if("Rcpp" %in% (.packages())){
+  detach("package:mzR", unload=TRUE) 
+  detach("package:Rcpp", unload=TRUE) 
+}
+library("EICim")
+library("MS1im")
+
+if (!require("BiocManager", quietly = TRUE))install.packages("BiocManager", repos = "http://cran.us.r-project.org")
+
 if (ParallelComputing == TRUE) {
+  if("foreach" %in% rownames(installed.packages()) == FALSE) {install.packages("foreach", repos = "http://cran.us.r-project.org")}
   library(foreach)
+  if("doParallel" %in% rownames(installed.packages()) == FALSE) {install.packages("doParallel", repos = "http://cran.us.r-project.org")}
   library(doParallel)
-  library(parallelly)
-  DC <- as.numeric(availableCores())
+  DC <- as.numeric(detectCores())
   if (is.na(DC)) {
     DC <- makePSOCKcluster(4)
-    registerDoParallel(DC)
-  } else if (HPC == TRUE) {
-    DC <- makePSOCKcluster(DC)
     registerDoParallel(DC)
   } else if (DC <= 4) {
     DC <- makePSOCKcluster(DC)
@@ -47,11 +69,45 @@ if (ParallelComputing == TRUE) {
     DC <- makePSOCKcluster(DC-2)
     registerDoParallel(DC)
   }
+  # Force the directory for parallel computing to be the one that is distributed not the local R directory (doPar error)
+  clusterEvalQ(DC, .libPaths()[2])
 }
 
+if("tictoc" %in% rownames(installed.packages()) == FALSE) {install.packages("tictoc", repos = "http://cran.us.r-project.org")}
 library(tictoc)
 tic.clear()
 # tic("Main")
+
+if("remotes" %in% rownames(installed.packages()) == FALSE) {install.packages("remotes", repos = "http://cran.us.r-project.org")}
+library("remotes")
+
+if("MassTools" %in% rownames(installed.packages()) == FALSE) {remotes::install_github("mjhelf/MassTools")}
+library("MassTools")
+
+#library(MetaboCoreUtils)
+if("enviPat" %in% rownames(installed.packages()) == FALSE) {install.packages("enviPat", repos = "http://cran.us.r-project.org")}
+library(enviPat, quietly=T)
+
+if("RMassBank" %in% rownames(installed.packages()) == FALSE) {BiocManager::install("RMassBank")}
+library("RMassBank")
+
+if("MetaboCoreUtils" %in% rownames(installed.packages()) == FALSE) {BiocManager::install("MetaboCoreUtils")}
+library("MetaboCoreUtils")
+
+if("sqldf" %in% rownames(installed.packages()) == FALSE) {install.packages("sqldf", repos = "http://cran.us.r-project.org")}
+library("sqldf")
+
+if("Rdisop" %in% rownames(installed.packages()) == FALSE) {install.packages("Rdisop", repos = "http://cran.us.r-project.org")}
+library("Rdisop")
+
+if("RSQLite" %in% rownames(installed.packages()) == FALSE) {install.packages("RSQLite", repos = "http://cran.us.r-project.org")}
+library("RSQLite")
+
+# if("gWidgets" %in% rownames(installed.packages()) == FALSE) {install.packages("gWidgets", repos = "http://cran.us.r-project.org")}
+# if("gWidgetstcltk" %in% rownames(installed.packages()) == FALSE) {install.packages("gWidgetstcltk", repos = "http://cran.us.r-project.org")}
+
+if("agricolae" %in% rownames(installed.packages()) == FALSE) {install.packages("agricolae", repos = "http://cran.us.r-project.org")}
+library("agricolae")
 
 if (FLOW == FALSE && csvInput == FALSE && ManuallyInputVariables == FALSE) {
   require(gWidgets)
@@ -59,6 +115,8 @@ if (FLOW == FALSE && csvInput == FALSE && ManuallyInputVariables == FALSE) {
   options(guiToolkit="tcltk")
 }
 
+#library(Rdisop)
+#BiocManager::install("Rdisop")
 library(RSQLite)
 library(sqldf)
 library(agricolae)
@@ -81,15 +139,16 @@ errorBox <- function(message) {
   return()
 }
 
+if("data.table" %in% rownames(installed.packages()) == FALSE) {install.packages("data.table", repos = "http://cran.us.r-project.org")}
 library(data.table)
+if("SearchTrees" %in% rownames(installed.packages()) == FALSE) {install.packages("SearchTrees", repos = "http://cran.us.r-project.org")}
 library(SearchTrees)
+if("comprehenr" %in% rownames(installed.packages()) == FALSE) {install.packages("comprehenr", repos = "http://cran.us.r-project.org")}
 library(comprehenr)
+if("mzR" %in% rownames(installed.packages()) == FALSE)  {
+  BiocManager::install("mzR")}
 library(mzR)
 
-#define function to concatenate file paths and files together without issues due to presence of trailing slash in file path.
-file.join = function(..., sep = .Platform$file.sep){
-    gsub("//", "/", file.path(..., sep = sep))
-}
 
 if (ManuallyInputVariables==TRUE){
   
@@ -145,8 +204,8 @@ if (ManuallyInputVariables==TRUE){
 }else if(csvInput == TRUE){
   ####################### Get input from csv VARIABLES SECTION ###############################
   #parametersDirectory
-  parametersDir <- "C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/RapidTest/"
-  parametersFile <- file.join(parametersDir, "PARAMETERS.csv")
+  parametersDir <- "C:/NEW_SOFTWARE/2023_24_UPDATES_FM_LM/FluoroMatch-4.5_GitHub/Tools/TESTING/RapidTest/"
+  parametersFile <- paste(parametersDir, "PARAMETERS.csv", sep="")
   parametersInput_csv <- read.csv(parametersFile, sep=",", na.strings="NA", dec=".", strip.white=TRUE,header=FALSE)
   parametersInput_csv <- as.matrix(parametersInput_csv)
   ErrorOutput<-0
@@ -3156,7 +3215,7 @@ for(i in seq_len(lengthFoldersToRun)){
     Classdirectory <- file.path(OutputDirectoryddMSNegByClass_in,"Confirmed_Compounds")
     AIFdirectory <- "Nothing"
     CreateIDs(file.path(fpath,FeatureTable_NEG), ddMS2directory, Classdirectory, AIFdirectory, ImportLibNEG, OutputDirectory, NegDDLib, NegClassDDLib, NegAIFLib, "Neg")
-    #InputDirectory<-"C:/Users/jpk72/Desktop/OUT/LipidMatch_Run/"; CommentColumn<-1; RowStartForFeatureTableData<-2; NegPos = "Neg"; OutDir="/Output/NegIDed_FIN.csv"; OutDirOnlyFrags="/Output/Neg_OnlyIDs_PredFrags.csv"; InputDir_Append="Output/ddMS/NegByClass/Additional_Files"; ID_name="PredictedFrag_IDs"; FragName="Frags"; nFrag="Num_Frags"; fileNames="Files"; ImportTable="/Output/NegIDed_Fragments.csv"
+    #InputDirectory<-"C:/Users/Jeremy Koelmel/Desktop/Desktop/Innovative_Omics/CLIENTS/2024_USGS/JBB_QCs/Annotated/"; CommentColumn<-1; RowStartForFeatureTableData<-2; NegPos = "Neg"; OutDir="/Output/NegIDed_FIN.csv"; OutDirOnlyFrags="/Output/Neg_OnlyIDs_PredFrags.csv"; InputDir_Append="Output/ddMS/NegByClass/Additional_Files"; ID_name="PredictedFrag_IDs"; FragName="Frags"; nFrag="Num_Frags"; fileNames="Files"; ImportTable="/Output/NegIDed_Fragments.csv"
     AppendFrag(CommentColumn, RowStartForFeatureTableData, InputDirectory, NegPos = "Neg", OutDir="Output/NegIDed_Fragments.csv", OutDirOnlyFrags="Output/Neg_OnlyIDs_Fragments.csv", InputDir_Append="Output/ddMS/Neg/Additional_Files", ID_name="Potential_IDs", FragName="Frags", nFrag="Num_Frags", fileNames="Files", ImportTable="Output/NegIDed.csv", firstFragAppender=TRUE)
     ##append by class (EPA MASTER in the case of PFAS as well) - in new columns
     if (Lipid == FALSE) {
@@ -3293,12 +3352,13 @@ for(i in seq_len(lengthFoldersToRun)){
     
     FeatureList_in <- as.matrix(read.csv(FeatureList_in_dir, sep=",", na.strings="NA", dec=".", strip.white=TRUE, header=TRUE, check.names = FALSE))
     nrow_FeatureList_in <- nrow(FeatureList_in)
-    MZ_Append <- rev(as.numeric(FeatureList_in[, 6])) # Column should be constant (future error?)
-    RT_Append <- rev(as.numeric(FeatureList_in[, 7])) # Column should be constant
-    IDs_Append <- rev(as.numeric(FeatureList_in[, 12])) # Column should be constant
+    MZ_Append <- as.numeric(FeatureList_in[, 6]) # Column should be constant (future error?)
+    RT_Append <- as.numeric(FeatureList_in[, 7]) # Column should be constant
+    IDs_Append <- as.numeric(FeatureList_in[, 12]) # Column should be constant
     Precursor_rawMSMS <- as.numeric(rawMSMS_df[, PrecursorMZCol_MSMS])
     RT_rawMSMS <- as.numeric(rawMSMS_df[, MSMS_scan_RT_col])
-    for (j in 2:nrow_FeatureList_in) { # Row should be constant (future error?)
+    #reverse because the last one is going to be the one that has an actual match and replace the others
+    for (j in nrow_FeatureList_in:(RowStartForFeatureTableData-1)) { # Row should be constant (future error?)
       ## Old, more nuanced approach
       
       # message(paste(j, "/", nrow_FeatureList_in, sep = ""))
@@ -3329,8 +3389,15 @@ for(i in seq_len(lengthFoldersToRun)){
       MZ_Append_current <- MZ_Append[j]
       RT_Append_current <- RT_Append[j]
       IDs_Append_current <- IDs_Append[j]
-      ppm_error <- ((Precursor_rawMSMS - MZ_Append_current)*10^6)/Precursor_rawMSMS
-      MZ_Conditional <- abs(ppm_error)<(ppm_Window/2)
+      if (alignMS2_ppm==TRUE) {
+        #calculate conditionals of whether or not a feature will have an associated MS/MS spectrum
+        ppm_error <- ((Precursor_rawMSMS - MZ_Append_current)*10^6)/Precursor_rawMSMS
+        MZ_Conditional <- abs(ppm_error)<(ppm_Window/2)
+      } else {
+        #calculate conditionals of whether or not a feature will have an associated MS/MS spectrum
+        Da_error <- Precursor_rawMSMS - MZ_Append_current
+        MZ_Conditional <- abs(Da_error)<(SelectionAccuracy/4)
+      }
       MZ_Index <- which(MZ_Conditional==TRUE)
       RT_Conditional <- ((RT_Append_current - RT_Window/2) < RT_rawMSMS) & (RT_rawMSMS < (RT_Append_current + RT_Window/2))
       RT_Index <- which(RT_Conditional==TRUE)
@@ -3636,36 +3703,71 @@ source(paste(InputLibrary,"/Scripts/MS1Spectragen.R",sep=""))
 source(paste(InputLibrary,"/Scripts/IsotopePercentages.R",sep=""))
 source(paste(InputLibrary,"/Scripts/Kaufmann.R",sep=""))
 source(paste(InputLibrary,"/Scripts/Manual_Review.R",sep=""))
+source(paste(InputLibrary,"/Scripts/Formula_Prediction.R",sep=""))
 
 arguments = construct_EM_arguments(
     PrecursorMassAccuracy = PrecursorMassAccuracy
-    ,RT_Window = RT_Window
+    ,RT_Tolerances = c(0.1, 0.5)
+    ,DT_Tolerances = c(0.1, 3)
+    ,isIM = FALSE
     ,OutputDirectory = OutputDirectory
     ,FeatureID_Cols = c(7,8,1,5)
     ,GroupCSVDirectory = GroupCSVDirectory
     ,isostring = ISOstring
     ,isotable = paste(InputLibrary,"/Scripts/secondary_isotopes.csv",sep="")
+    ,path_to_mzXML_Files = target_mzXML
 )
-arguments$path_to_mzXML_Files = target_mzXML
 
 runallEM(Target_mzXML, arguments, runmode = runNegddMS)
 runallEM(Target_mzXML, arguments, runmode = runPosddMS, isNeg = FALSE)
+
+#######################Kaufmann###################################
 
 #Kaufmann eC, and ratios, values
 MD_col_name <- "mass.defect"
 MZ_col_name <- "m.z"
 C13_col_name <- "13C1"
+
 if (runPosddMS) {
   outputFile<-DetermineFilePath("Pos")
   Kaufmann_eCs(outputFile,MD_col_name,MZ_col_name,C13_col_name)
-  print("Kaufmann plot inforation complete, positive mode")
+  print("Kaufmann plot information complete, positive mode")
   #Column Headers for Editing and Markup
   Review_Col_Names(outputFile)
 }
 if (runNegddMS) {
   outputFile<-DetermineFilePath("Neg")
   Kaufmann_eCs(outputFile,MD_col_name,MZ_col_name,C13_col_name)
-  print("Kaufmann plot inforation complete, negative mode")
+  print("Kaufmann plot information complete, negative mode")
   #Column Headers for Editing and Markup
   Review_Col_Names(outputFile)
+}
+
+#######################Formula Prediction###################################
+# GLOBALS
+eList1 = c('C','H','N','O','S','F','Br','Cl')
+eList2 = c('C','H','N','O','S','F','P')
+
+adducts <- data.frame(Adduct=c('[M-H]-','[M+H]+'),
+                      a=c(NA,'H1'),
+                      d=c('H1',NA))
+
+MF_topN=10  #Choose how many MFs to store
+
+# Formula Prediction can take a significant amount of time, if set to 0 the algorithm will try and predict formula for all potential PFAS (filtered by score)
+Override_Predict<-1000 #set to 2 or higher to only predict formula for "n" top ranked features
+
+if (runPosddMS) {
+  fh_Feature_MS1s<-paste0(OutputDirectory,"/Pos_Feature_MS1s.csv")
+  fh_Feature_IDList<-paste0(OutputDirectory,"/PosIDed_FIN.csv")
+  fh_MS1<-paste0(OutputDirectory,'/Pos_Feature_pFormula_MS1s.csv')
+  fh_IDed_FIN<-paste0(OutputDirectory,'/PosIDed_FIN.csv')
+  Formula_Prediction(Override_Predict,fh_Feature_MS1s,fh_Feature_IDList,fh_MS1,fh_IDed_FIN,MF_topN,adducts,eList1,eList2,q=1,Poltxt="+",(ppm_Window/2))
+}
+if (runNegddMS) {
+  fh_Feature_MS1s<-paste0(OutputDirectory,"/Neg_Feature_MS1s.csv")
+  fh_Feature_IDList<-paste0(OutputDirectory,"/NegIDed_FIN.csv")
+  fh_MS1<-paste0(OutputDirectory,'/Neg_Feature_pFormula_MS1s.csv')
+  fh_IDed_FIN<-paste0(OutputDirectory,'/NegIDed_FIN.csv')
+  Formula_Prediction(Override_Predict,fh_Feature_MS1s,fh_Feature_IDList,fh_MS1,fh_IDed_FIN,MF_topN,adducts,eList1,eList2,q=-1,Poltxt="-",(ppm_Window/2))
 }
