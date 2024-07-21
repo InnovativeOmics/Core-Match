@@ -7,17 +7,21 @@ library(mzR)
 
 construct_EM_arguments <- function(
     PrecursorMassAccuracy = PrecursorMassAccuracy
-    ,RT_Window = RT_Window
+    ,RT_Tolerances = RT_Tolerances
+    ,DT_Tolerances = DT_Tolerances
     ,OutputDirectory = OutputDirectory
     ,FeatureID_Cols = FeatureID_Cols
     ,GroupCSVDirectory = GroupCSVDirectory
     ,isostring = ISOstring
     ,isotable = isotable 
+    ,isIM = isIM
+    ,path_to_mzXML_Files
 ){
     # Commented items need to be defined for those algorithms.
     arguments = list(
         #USER
-            path_to_output_folder = OutputDirectory
+      path_to_mzXML_Files = path_to_mzXML_Files
+            ,path_to_output_folder = OutputDirectory
             # ,fn_mzxml = ""
             # ,fn_FeatureID = "NegIDed_FIN.csv"
             # ,isostring = "13C5;N;S;Cl4;18O;Br2"
@@ -28,34 +32,31 @@ construct_EM_arguments <- function(
             ,mztol = PrecursorMassAccuracy/2
             ,precision_mz = 5
             ,precision_rt = 2
-            ,precision_i = 0
+            ,precision_i = 3
             ,min_intensity = 1
             ,use_min_i_filter = FALSE
-            ,cols = c("rt", "mz", "intensity", "pMz", "snum")
             ,FeatureID_SkipRows = c()
+            ,rttol = RT_Tolerances
+            ,dttol = DT_Tolerances
 
-        # Some
-            ,ncols = 5
+        # Some=
             ,toggle_frag_row = TRUE
             ,FeatureID_Cols = FeatureID_Cols # c(6,7,12) #mz, rt, rowID
             ,FeatureID_SkipRows = c() #c() means don't skip, c(1) means skip the first row
-            ,Min_EIC_Len = 3
+            ,Min_EIC_Len = 5
             ,AggFUN = max #min, mean, or max: sum will sum the mz and rt would need more code
             ,UseAgg = TRUE 
-            # ,fn_ms2_output = "EXAMPLE_MS2_OUTPUT.ms2" # this is where the MS2 is stored using feature table
-
-        # MS1
-            # ,mzZoomWindow = 5 #now based on max RelativeMass
-            # ,FeatureID_Cols = c(6,7,12,4) #mz, rt, rowID, formula
-            # ,fn_MS1_output = "EXAMPLE_MS1_OUTPUT.csv" # this is where the MS1 is stored using feature table
-
-        # EIC
-            ,rttol = (RT_Window/2) * 6
-            # ,fn_eic_output = "EXAMPLE_EIC_OUTPUT.csv" # this is where the EIC is stored using feature table
-            # ,fn_csv_output = "EXAMPLE_CSV_OUTPUT.csv" # this is converted from mzxml data
+            ,isIM = isIM
     )
     if (length(GroupCSVDirectory)>0) { 
         arguments$FeatureID_SkipRows = c(1)
+    }
+    if(isIM){
+        arguments$cols = c("rt", "mz", "intensity", "dt")
+        arguments$colheader = c("Feature","mz","RT","DT","Intensity","File")
+    } else {
+        arguments$cols = c("rt", "mz", "intensity")
+        arguments$colheader = c("Feature", "mz", "RT", "Intensity", "File")
     }
     return(arguments)
 }
@@ -74,7 +75,7 @@ readFeatureTable <- function(fn, columns, skip){
     return(cols)
 }
 
-getSpectra <- function(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i){
+getSpectra <- function(arguments, PEAKS, IDs, rt, imdt, i){
     # makes a mini matrix of the spectra
     IDi = IDs[i]
     p = PEAKS[[i]]
@@ -85,8 +86,9 @@ getSpectra <- function(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i){
     m = matrix(nrow = nrow(p), ncol = length(arguments$cols))
     m[,1] = rt[i]
     m[,2:3] = p
-    m[,4] = pMz[i]
-    m[,5] = snum[i]
+    # m[,4] = pMz[i]
+    # m[,5] = snum[i]
+    if("dt" %in% arguments$cols){ m[,4] = imdt[i] } # Ion Mobility Drift Time
     # If needed, set extra column data
     colnames(m) = arguments$cols
     return(m)
@@ -94,15 +96,20 @@ getSpectra <- function(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i){
 
 getAllSpectras <- function(arguments, AllIons, IDs, isMS1=FALSE){
     # creates matrix for all scans for a particular CE
-    end = length(AllIons)
     PEAKS = lapply(seq_along(IDs), function(i) peaks(AllIons, IDs[i]))
     data = header(AllIons,IDs)
-    rt = data$retentionTime/60 
-    pMz = data$precursorMZ #get precursorMZ
-    snum = data$acquisitionNum #get acquisition number (scan num)
+    rt = data$retentionTime/60 # retention times in minutes
+    # pMz = data$precursorMZ #get precursorMZ
+    # snum = data$acquisitionNum #get acquisition number (scan num)
+    if("dt" %in% arguments$cols){ 
+        # Ion Mobility Drift Time
+        imdt = data$ionMobilityDriftTime
+    } else{
+        imdt = NULL
+    }
 
-    # print(paste("length of CE processing: ",length(IDs)))
-    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, AllIons, PEAKS, data, IDs, rt, pMz, snum, i))
+    print(paste("length of CE processing: ",length(IDs)))
+    MS = lapply(seq_along(IDs), function(i) getSpectra(arguments, PEAKS, IDs, rt, imdt, i))
     M = do.call(rbind, MS)
     if(isMS1){return(MS)}
     return(M)

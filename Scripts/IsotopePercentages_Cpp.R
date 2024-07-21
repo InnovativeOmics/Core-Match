@@ -98,7 +98,7 @@ append_percentages <- function( arguments ){
     arguments$selected_isotopes = genIsoTable(arguments)$Symbol
 
     arguments$fn_MS1_input = file.path(arguments$path_to_output_folder, arguments$fn_MS1_output)
-    arguments$fn_FeatureID_output = file.path(arguments$path_to_output_folder, paste("isotopes", arguments$fn_FeatureID, sep="_"))
+    #arguments$fn_FeatureID_output = file.path(arguments$path_to_output_folder, paste("isotopes", arguments$fn_FeatureID, sep="_"))
     arguments$fn_FeatureID_wpath = file.path(arguments$path_to_output_folder, arguments$fn_FeatureID)
     ms1_data = read.csv(arguments$fn_MS1_input)
     # print(ms1_data)

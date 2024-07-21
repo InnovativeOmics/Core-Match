@@ -14,7 +14,8 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
   
   ## Calculate Scores for MFs in FeatureID List
   Feature_MF_List <- pks_FeatureIDs[pks_FeatureIDs$Score %in% c('A','A-','B+','B','B-','C+','C'),]
-  Feature_MF_List <- Feature_MF_List[which(Feature_MF_List$Formula != '' & !is.na(Feature_MF_List$Formula)),] #MF cannot be blank to score it
+  ## Note I removed Hg from predictions... because it was causing an error
+  Feature_MF_List <- Feature_MF_List[which(Feature_MF_List$Formula != '' & !is.na(Feature_MF_List$Formula) & !grepl("Hg", Feature_MF_List$Formula)),] #MF cannot be blank to score it
   
   ## Start MF Reference Scoring for High Conf hits || BM = 1.6 sec per known feature
   FormulaMatches <- data.frame()
@@ -130,7 +131,7 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
   ## Careful ***
   
   for(f in 1:n_DN_MFs){
-  
+    
     print(paste0('Processing feature ',f))
     ft.comment <- ''
     #Initialize
@@ -245,8 +246,9 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
           MFList <- MFList[which(  (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
                                      (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
                                      (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
-                                     (MFList$NtoC <= 4 | is.na(MFList$NtoC)) &
-                                     (MFList$OtoC <= 3 | is.na(MFList$CltoC)) &
+                                     (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
+                                     (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
+                                     (MFList$OCS <= 1 | is.na(MFList$OCS)) &
                                      (MFList$PtoC <= 0.3 | is.na(MFList$PtoC)) &  #Exception
                                      (MFList$StoC <=3 | is.na(MFList$StoC)) &
                                      (MFList$OStoP <= 3 | is.na(MFList$OStoP))
@@ -258,8 +260,9 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
                                        (MFList$HFClBrItoC >= 0.2 | is.na(MFList$HFClBrItoC)) & 
                                        (MFList$FtoC <= 3.5 | is.na(MFList$FtoC)) &   ## Modified 99.7%
                                        (MFList$CltoC <= 0.8 | is.na(MFList$CltoC)) &
-                                       (MFList$NtoC <= 1.3 | is.na(MFList$NtoC)) &
-                                       (MFList$OtoC <= 1.2 | is.na(MFList$CltoC)) &
+                                       (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
+                                       (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
+                                       (MFList$OCS <= 1 | is.na(MFList$OCS)) &
                                        (MFList$PtoC <= 0.15 | is.na(MFList$PtoC)) & 
                                        (MFList$StoC <=0.8 | is.na(MFList$StoC)) &
                                        (MFList$OStoP <= 0.7 | is.na(MFList$OStoP))
@@ -399,8 +402,9 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
                                   (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
                                   (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
                                   (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
-                                  (MFList$NtoC <= 4 | is.na(MFList$NtoC)) &
-                                  (MFList$OtoC <= 3 | is.na(MFList$CltoC)) &
+                                  (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
+                                  (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
+                                  (MFList$OCS <= 1 | is.na(MFList$OCS)) &
                                   (MFList$PtoC <= 2 | is.na(MFList$PtoC)) & 
                                   (MFList$StoC <=3 | is.na(MFList$StoC)) &
                                   (MFList$OStoP <= 3 | is.na(MFList$OStoP))
@@ -1014,9 +1018,14 @@ SpectrumToMFList2 <- function(s.unk, Q1ref, q = -1, ppm = 10,top = NULL, nC=NULL
       MF["Br"]/MF["C"]
     })
     
+    res$OCS <-  sapply(sfs,function(MF){
+      (MF["O"])/((MF["C"])+1+((MF["S"]/MF["S"])*4))
+    })    
+    
     res$HFClBrItoC <-  sapply(sfs,function(MF){
       (MF["H"]+MF["F"]+MF["Cl"]+MF["Br"]+MF["I"])/MF["C"]  #Typically, halogens replace H so this ratio is useful (ie: for PFAS)
     })
+    
     
     
     if(!is.null(Filters$moreRatios) && Filters$moreRatios){
