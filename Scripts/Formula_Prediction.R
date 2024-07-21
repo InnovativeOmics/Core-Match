@@ -1,3 +1,8 @@
+##Debugging variable (after running rest of code in Modular)
+# q=-1
+# Poltxt="-"
+# ppmTol=(ppm_Window/2)
+
 Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDList,fh_MS1,fh_IDed_FIN,MF_topN,adducts,eList1,eList2,q,Poltxt,ppmTol) {
   data("isotopes")  #requires enviPat
   mf.stor=T  #For debugging purposes (stores times to run)
@@ -154,11 +159,12 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
       s.mdf <- mzSpec_MDFilter2(spectrum=s.unk[,1:2], Q1 = MI, mdTol=ppmTol*2.8, z=1, 
                                 splot=F, minIntN = 0, forceQ1=T, labelBG=F, plotBG=F)  # Deconvolute spectrum
       # s.mdf$Plot
-      
-      s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target' & s.mdf$Spectrum$mzIP>=0),c('mz','Int','Int_N','mzIP')]
-      s.cln <- merge(s.cln, aggregate(Int_N ~ round(mzIP), s.cln, FUN=max) )
-      s.cln <- s.cln[order(s.cln$mzIP),c('mz','Int','Int_N','mzIP')]
-      s.cln <- s.cln[!duplicated(s.cln[,c('Int_N','mzIP')]),]
+      if(nrow(s.mdf$Spectrum)>1){
+        s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target' & s.mdf$Spectrum$mzIP>=0),c('mz','Int','Int_N','mzIP')]
+        s.cln <- merge(s.cln, aggregate(Int_N ~ round(mzIP), s.cln, FUN=max) )
+        s.cln <- s.cln[order(s.cln$mzIP),c('mz','Int','Int_N','mzIP')]
+        s.cln <- s.cln[!duplicated(s.cln[,c('Int_N','mzIP')]),]
+      }else{s.cln <- data.frame()}
       n_mz <- nrow(s.cln)
       
       # Preprocessing - Check for spectral fidelity issues, mzIP = 1 position 
@@ -581,7 +587,10 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
   final_MS1_df <- cbind(pks_FeatureIDs[,1:idx_insert_colA],  MS1_Features_MF, pks_FeatureIDs[,(idx_insert_colB):ft.ncol] )
   write.csv(final_MS1_df, file=fh_IDed_FIN, row.names = F)
   
-} ## End of main MFPredict function
+} 
+
+########################## End of main MFPredict function #######################################################
+##################################################################################################################
 
 # Apply Senior Rule to MF
 getSenior3.MFobject2 <- function (MF){
