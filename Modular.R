@@ -1,8 +1,8 @@
 ##Jeremy Koelmel  jeremykoelmel@gmail.com
 ##Michael Kummer  mk.code.na@gmail.com
+##David Schiessel david@schiessel.us
 ##Paul Stelben    paul.stelben@yale.edu
 ##Nick Kroeger    nkroeger.cs@gmail.com
-##David Schiessel david@schiessel.us
 
 rm(list = ls()) #remove all R objects from memory, this program can be memory intensive as it is dealing with huge datasets
 closeAllConnections()
@@ -11,7 +11,7 @@ closeAllConnections()
 #If you want to manually input your variables...
 # 1. Set ManuallyInputVariables <- TRUE (all caps)
 # 2. Assign variables under the next if statement, "if (ManuallyInputVariables==TRUE)"
-FLOW <- TRUE
+FLOW <- FALSE
 csvInput <- TRUE
 ManuallyInputVariables <- FALSE
 RT_flagging <- TRUE #JPK: for PFAS analysis
@@ -218,8 +218,8 @@ if (ManuallyInputVariables==TRUE){
 }else if(csvInput == TRUE){
   ####################### Get input from csv VARIABLES SECTION ###############################
   #parametersDirectory
-parametersDir <- "C:/SOFTWARE/FluoroMatch_5.3/Flow/LipidMatch_Distribution/"
-parametersFile <- paste(parametersDir, "PARAMETERS.csv", sep="")
+  parametersDir <- "D:/FluoroMatch_Data/2024_07_01_SarahStow_IM_PNNLtool/2024_07_14_NIST_C_FIN/"
+  parametersFile <- paste(parametersDir, "PARAMETERS.csv", sep="")
   parametersInput_csv <- read.csv(parametersFile, sep=",", na.strings="NA", dec=".", strip.white=TRUE,header=FALSE)
   parametersInput_csv <- as.matrix(parametersInput_csv)
   ErrorOutput<-0
@@ -452,7 +452,7 @@ AIF_Code<-"2"
 Class_Code<-"3"
 ExactMass_Code<-"4"
 NoID_Code<-"5"
-# PrecursorMassAccuracy<-PrecursorMassAccuracy/2
+PrecursorMassAccuracy<-PrecursorMassAccuracy/2
 
 PPM_CONST <- (10^6 + ppm_Window/2) / 10^6
 
