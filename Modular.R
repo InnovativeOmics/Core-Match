@@ -452,7 +452,7 @@ AIF_Code<-"2"
 Class_Code<-"3"
 ExactMass_Code<-"4"
 NoID_Code<-"5"
-PrecursorMassAccuracy<-PrecursorMassAccuracy/2
+#PrecursorMassAccuracy<-PrecursorMassAccuracy/2
 
 PPM_CONST <- (10^6 + ppm_Window/2) / 10^6
 
