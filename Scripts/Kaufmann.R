@@ -7,7 +7,11 @@ Kaufmann_eCs <- function(outputFile,MD_col_name,MZ_col_name,C13_col_name){
     NegIDed_Fin_eCs<-as.matrix(NegIDed_Fin_eCs)
     MDcol<-which(NegIDed_Fin_eCs[1,]==MD_col_name)
     MZcol<-which(NegIDed_Fin_eCs[1,]==MZ_col_name)
-    C13_col<-which(NegIDed_Fin_eCs[1,]==C13_col_name)
+    if(length(which(NegIDed_Fin_eCs[1,]==C13_col_name))>0) {
+      C13_col<-which(NegIDed_Fin_eCs[1,]==C13_col_name)
+    } else {
+      C13_col<-which(NegIDed_Fin_eCs[1,]==paste("X",C13_col_name,sep=""))
+    }
     eC<-as.numeric(NegIDed_Fin_eCs[RowStartForFeatureTableData:nrow(NegIDed_Fin_eCs),C13_col])/1.0816
     MZ_eC<-as.numeric(NegIDed_Fin_eCs[RowStartForFeatureTableData:nrow(NegIDed_Fin_eCs),MZcol])/eC
     MD_eC<-as.numeric(NegIDed_Fin_eCs[RowStartForFeatureTableData:nrow(NegIDed_Fin_eCs),MDcol])/eC

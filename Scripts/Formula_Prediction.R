@@ -30,81 +30,91 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
   #}
   # Override n_FeaturesMF=1000.   DO NOT DO THIS HERE DS 3/19/24 - you want to score all MFs from upstream.  Only limit Denovo below
   for(fmf in 1:n_FeaturesMF){
-    
-    ft <- Feature_MF_List[fmf,]
-    ft.MF = ft$Formula
-    ft.id <- ft$row.ID
-    pks <- PeakList[which(PeakList$Feature==ft.id),]  #Potentially grab all Files for a feature
-    if(nrow(pks) > 0){
-      
-      idx_pk_spec <- which(pks$Intensity==max(pks$Intensity))
-      pk <- pks[idx_pk_spec,]  #Choose file with highest int
-      
-      s.unk <- pks_MS1_Spectra[which(pks_MS1_Spectra$Feature==ft.id & 
-                                       pks_MS1_Spectra$File==pk$File & 
-                                       (pks_MS1_Spectra$m.z - pk$m.z > -2.5) &
-                                       (pks_MS1_Spectra$m.z - pk$m.z <  4.5) ), 
-                               c('m.z','Intensity',"Isotope")] ## Lookup spectra with that FileID and Feature
-      s.mdf <- mzSpec_MDFilter2(spectrum=s.unk[,1:2], Q1 = pk$m.z, mdTol=ppmTol*4, z=1, splot=F, plotBG=F, minIntN = 1)  # Deconvolute spectrum
-      s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target'),c('mz','Int','Int_N','mzIP')]
-      n_mz <- nrow(s.cln)
-      
-      # Setup Reference Mass Spectrum
-      ion_op <- merge(ft, adducts)[,c('a','d')]
-      MF.ion <- ionizeMF(m=ft.MF, a=ion_op$a, d=ion_op$d)
-      
-      # Generate Ref Spec
-      s.ref <- MFtoSpectrum(formula=MF.ion$Mion, q=q, Res=F, ppmTol, patOnly=T)
-      colnames(s.ref) <- c('mz','Int')  #rename columns
-      s.ref <- cbind(s.ref, mzIP=seq(1:nrow(s.ref))) #Gets mzIP
-      
-      s.unk.ol <- s.cln[which(s.cln$mz > (min(s.ref$mz)-0.1) & s.cln$mz < (max(s.ref$mz)+0.1)),] #Later need to refine spectrum for charge
-      s.unk.ol$Int_N <- 100*s.unk.ol$Int_N/max(s.unk.ol$Int_N[which(s.unk.ol$mzIP==0)])  #Must renormalize
-      
-      # Old check for ppm diff
-      #idx_rows <- 1:min(nrow(s.unk.ol),nrow(s.ref))
-      #check.ppm <- length(which(abs(s.unk.ol[idx_rows,'mz'] - s.ref[idx_rows,'mz'])*1e6/ft$m.z < ppmTol*2)) == min(nrow(s.unk.ol),nrow(s.ref))
-      
-      #Check overlap extent.  Is spec "close enough" to compare
-      checkOL <- abs(s.ref$mz[which(s.ref$Int==100)] - 
-                       s.unk.ol$mz[which(s.unk.ol$Int_N==100 & s.unk.ol$mzIP<=2)])
-      
-      if(!is.na((checkOL[1] < 1) && (checkOL[1] > 0))){ 
-        #SPS <- SpectrumSimilarity_custom(s.ref, s.unk.ol, dppm = z*ppmTol, b = 0.1, int.prec=2,
-        #                                 bottom.label = paste0(round(ft$m.z,4),' @',round(Feature_MF_List$Retention.Time[fmf], 2),' min'), 
-        #                                 top.label = paste('Simulated',MF.ion$Mion,Poltxt), 
-        #                                 xlim = c(min(s.ref$mz[which(s.ref$Int>1)])-0.2, max(s.ref$mz[which(s.ref$Int>1)])+0.2), 
-        #                                 x.threshold = 0, print.alignment = F, print.graphic = T, output.list = T)
-        #MFScore1 <- round(SPS$similarity.score,5)
+    tryCatch({
+      ft <- Feature_MF_List[fmf,]
+      ft.MF = ft$Formula
+      ft.id <- ft$row.ID
+      pks <- PeakList[which(PeakList$Feature==ft.id),]  #Potentially grab all Files for a feature
+      if(nrow(pks) > 0){
         
-        ft.MFScores <- SpectrumSimilarity_custom2(obs=s.unk.ol, the=s.ref, dppm=ppmTol, int_prec = 0.3, rnd_prec = 5)
+        idx_pk_spec <- which(pks$Intensity==max(pks$Intensity))
+        pk <- pks[idx_pk_spec,]  #Choose file with highest int
         
+        s.unk <- pks_MS1_Spectra[which(pks_MS1_Spectra$Feature==ft.id & 
+                                         pks_MS1_Spectra$File==pk$File & 
+                                         (pks_MS1_Spectra$m.z - pk$m.z > -2.5) &
+                                         (pks_MS1_Spectra$m.z - pk$m.z <  4.5) ), 
+                                 c('m.z','Intensity',"Isotope")] ## Lookup spectra with that FileID and Feature
+        s.mdf <- mzSpec_MDFilter2(spectrum=s.unk[,1:2], Q1 = pk$m.z, mdTol=ppmTol*4, z=1, splot=F, plotBG=F, minIntN = 1)  # Deconvolute spectrum
+        s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target'),c('mz','Int','Int_N','mzIP')]
+        n_mz <- nrow(s.cln)
         
-        rnf <- max(s.unk.ol$Int) #renormalization factor
-        rpf <- nrow(ft.MFScores$Alignment)# rows per feature
-        FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature =pk$Feature,  
-                                                      MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
-                                                      Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
-                                                      PredMZ = ft.MFScores$Alignment$m_ref, PredAbundance=ft.MFScores$Alignment$i_ref*rnf,
-                                                      File = pk$File,
-                                                      Score1 = ft.MFScores$Score1, Score2=ft.MFScores$Score2, Comment='', Rank='DB_Match' ) )
+        if(length(ft$Adduct)<1) {
+          if(q<0) {
+            ft$Adduct="[M-H]-"
+            print("Adduct not found in sheet, forced to [M-H]-")
+          } else if (q>0) {
+            ft$Adduct="[M+H]+"
+            print("Adduct not found in sheet, forced to [M+H]+")
+          }
+        }
+        # Setup Reference Mass Spectrum
+        ion_op <- merge(ft, adducts)[,c('a','d')]
+        MF.ion <- ionizeMF(m=ft.MF, a=ion_op$a, d=ion_op$d)
         
-        #MFScore2 <- InterpretMSSpectrum::mScore(obs = s.unk.ol, the = s.ref)
+        # Generate Ref Spec
+        s.ref <- MFtoSpectrum(formula=MF.ion$Mion, q=q, Res=F, ppmTol, patOnly=T)
+        colnames(s.ref) <- c('mz','Int')  #rename columns
+        s.ref <- cbind(s.ref, mzIP=seq(1:nrow(s.ref))) #Gets mzIP
         
-      }else{
-        FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature = pk$Feature, 
+        s.unk.ol <- s.cln[which(s.cln$mz > (min(s.ref$mz)-0.1) & s.cln$mz < (max(s.ref$mz)+0.1)),] #Later need to refine spectrum for charge
+        s.unk.ol$Int_N <- 100*s.unk.ol$Int_N/max(s.unk.ol$Int_N[which(s.unk.ol$mzIP==0)])  #Must renormalize
+        
+        # Old check for ppm diff
+        #idx_rows <- 1:min(nrow(s.unk.ol),nrow(s.ref))
+        #check.ppm <- length(which(abs(s.unk.ol[idx_rows,'mz'] - s.ref[idx_rows,'mz'])*1e6/ft$m.z < ppmTol*2)) == min(nrow(s.unk.ol),nrow(s.ref))
+        
+        #Check overlap extent.  Is spec "close enough" to compare
+        checkOL <- abs(s.ref$mz[which(s.ref$Int==100)] - 
+                         s.unk.ol$mz[which(s.unk.ol$Int_N==100 & s.unk.ol$mzIP<=2)])
+        
+        if(!is.na((checkOL[1] < 1) && (checkOL[1] > 0))){ 
+          #SPS <- SpectrumSimilarity_custom(s.ref, s.unk.ol, dppm = z*ppmTol, b = 0.1, int.prec=2,
+          #                                 bottom.label = paste0(round(ft$m.z,4),' @',round(Feature_MF_List$Retention.Time[fmf], 2),' min'), 
+          #                                 top.label = paste('Simulated',MF.ion$Mion,Poltxt), 
+          #                                 xlim = c(min(s.ref$mz[which(s.ref$Int>1)])-0.2, max(s.ref$mz[which(s.ref$Int>1)])+0.2), 
+          #                                 x.threshold = 0, print.alignment = F, print.graphic = T, output.list = T)
+          #MFScore1 <- round(SPS$similarity.score,5)
+          
+          ft.MFScores <- SpectrumSimilarity_custom2(obs=s.unk.ol, the=s.ref, dppm=ppmTol, int_prec = 0.3, rnd_prec = 5)
+          
+          
+          rnf <- max(s.unk.ol$Int) #renormalization factor
+          rpf <- nrow(ft.MFScores$Alignment)# rows per feature
+          FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature =pk$Feature,  
+                                                        MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
+                                                        Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
+                                                        PredMZ = ft.MFScores$Alignment$m_ref, PredAbundance=ft.MFScores$Alignment$i_ref*rnf,
+                                                        File = pk$File,
+                                                        Score1 = ft.MFScores$Score1, Score2=ft.MFScores$Score2, Comment='', Rank='DB_Match' ) )
+          
+          #MFScore2 <- InterpretMSSpectrum::mScore(obs = s.unk.ol, the = s.ref)
+          
+        }else{
+          FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature = pk$Feature, 
+                                                        MZ = ft$m.z, Abundance=NA, 
+                                                        Isotope='M', Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
+                                                        PredMZ=NA, PredAbundance = NA, File=pk$File,
+                                                        Score1=NA, Score2=NA, Comment='Spectral overlap too low', Rank=NA) )
+        } #endif check overlap
+      }else{ #endif spec found  
+        FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature = ft$row.ID, 
                                                       MZ = ft$m.z, Abundance=NA, 
-                                                      Isotope='M', Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
-                                                      PredMZ=NA, PredAbundance = NA, File=pk$File,
-                                                      Score1=NA, Score2=NA, Comment='Spectral overlap too low', Rank=NA) )
-      } #endif check overlap
-    }else{ #endif spec found  
-      FormulaMatches <- rbind(FormulaMatches, cbind(fmf, Feature = ft$row.ID, 
-                                                    MZ = ft$m.z, Abundance=NA, 
-                                                    Isotope=NA, Formula = NA, zFormula=NA,
-                                                    PredMZ=NA, PredAbundance = NA, File=ft$Files.1[1],
-                                                    Score1=NA, Score2=NA, Comment='MS1 Spectra not found for feature', Rank=NA) )
-    }
+                                                      Isotope=NA, Formula = NA, zFormula=NA,
+                                                      PredMZ=NA, PredAbundance = NA, File=ft$Files.1[1],
+                                                      Score1=NA, Score2=NA, Comment='MS1 Spectra not found for feature', Rank=NA) )
+      }
+    }, error=function(e){cat(paste0(fmf," This high confidence feature could not get a clean spectrum but continuing; description of the error:"),conditionMessage(e), "\n")})
   }
   
   # write.csv(FormulaMatches, file=paste0(OutputDirectory,'Neg_Feature_MS1s_MFScores.csv'), row.names = F)
@@ -136,361 +146,364 @@ Formula_Prediction <- function(Override_Predict,fh_Feature_MS1s,fh_Feature_IDLis
   ## Careful ***
   
   for(f in 1:n_DN_MFs){
-    
-    print(paste0('Processing feature ',f))
-    ft.comment <- ''
-    #Initialize
-    decIso <- T # Decompose Isotopes/spectrum (vs decomposeMass only)
-    MFSolved <- F # MF List made successfully
-    MFEscape <- F # Used at end of while loop, Must be reset to F
-    
-    
-    pk <- ss_MS1_pks[f,] 
-    ft <- pks_FeatureIDs[which(pks_FeatureIDs$row.ID==pk$Feature),]
-    
-    if(nrow(ft)>0 & pk$m.z <= 1000){
-      
-      s.unk <- ss_MS1_spectra[which(ss_MS1_spectra$Feature==ss_MS1_pks$Feature[f] & 
-                                      ss_MS1_spectra$File==ss_MS1_pks$File[f] &
-                                      (ss_MS1_spectra$m.z - pk$m.z > -2.5) &
-                                      (ss_MS1_spectra$m.z - pk$m.z <  4.5)  ),c('m.z','Intensity',"Isotope")]
-      MI <- pk$m.z
-      
-      s.mdf <- mzSpec_MDFilter2(spectrum=s.unk[,1:2], Q1 = MI, mdTol=ppmTol*2.8, z=1, 
-                                splot=F, minIntN = 0, forceQ1=T, labelBG=F, plotBG=F)  # Deconvolute spectrum
-      # s.mdf$Plot
-      if(nrow(s.mdf$Spectrum)>1){
-        s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target' & s.mdf$Spectrum$mzIP>=0),c('mz','Int','Int_N','mzIP')]
-        s.cln <- merge(s.cln, aggregate(Int_N ~ round(mzIP), s.cln, FUN=max) )
-        s.cln <- s.cln[order(s.cln$mzIP),c('mz','Int','Int_N','mzIP')]
-        s.cln <- s.cln[!duplicated(s.cln[,c('Int_N','mzIP')]),]
-      }else{s.cln <- data.frame()}
-      n_mz <- nrow(s.cln)
-      
-      # Preprocessing - Check for spectral fidelity issues, mzIP = 1 position 
-      if(n_mz>1){
-        # check for spectral discontinuity
-        mzIPdc <- which(diff(s.cln$mzIP) != 1)  # removed +1
-        txt_mzIPdc <- paste0(mzIPdc, collapse = ',')
-        
-        if(any(s.cln$Int_N[s.cln$mzIP==2] < 80 & s.cln$mzIP>2 & mzIPdc>2 & s.cln$Int_N>80)){
-          s.cln <- s.cln[-which(s.cln$mzIP>2 & s.cln$Int_N>80),]
-        }
-        
-        #Method 2 - % RSD in spectra is high > 1
-        s.RSD <- sd(s.cln$Int_N)/mean(s.cln$Int_N)
-        if(s.RSD < 0.9 & MI < 800){decIso <- F}
-        
-        #Method 3 - mzIP position 1 intensity must make sense for mz(MI)
-        M1Cutoff <- MI/(12*0.9259)+30
-        idx_mzIP1 <- s.cln$mzIP %in% 1
-        if(any(idx_mzIP1)){
-          if(any(s.cln$Int_N[idx_mzIP1] > M1Cutoff)){
-            paste0(ft.comment,'| Noisy spectrum ')
-            decIso <- F
-          }
-        }
-      }else # switch off deciso if M+1 position does not make sense
-      {
-        ft.comment <- paste0(ft.comment,'| Single mz spectrum ')
-        decIso <- F
-        MFSolved <- F
-        txt_mzIPdc <- NA
-      } #switch off decIso
+    tryCatch({
+      print(paste0('Processing feature ',f))
+      ft.comment <- ''
+      #Initialize
+      decIso <- T # Decompose Isotopes/spectrum (vs decomposeMass only)
+      MFSolved <- F # MF List made successfully
+      MFEscape <- F # Used at end of while loop, Must be reset to F
       
       
-      ## Ideal case where n of mzs at least two
-      if(n_mz > 1 && decIso==T){
-        #####-----------------------------------------------------------------------------------
-        ### DeNovo MF List generation from mass spectrum decomposition
+      pk <- ss_MS1_pks[f,] 
+      ft <- pks_FeatureIDs[which(pks_FeatureIDs$row.ID==pk$Feature),]
+      
+      if(nrow(ft)>0 & pk$m.z <= 1000){
         
-        # Check MI Mass
-        if(MI != s.mdf$MI){
-          MI <- s.mdf$MI
-          ft.comment <- paste0(ft.comment, '| MI Updated ')
-        }
+        s.unk <- ss_MS1_spectra[which(ss_MS1_spectra$Feature==ss_MS1_pks$Feature[f] & 
+                                        ss_MS1_spectra$File==ss_MS1_pks$File[f] &
+                                        (ss_MS1_spectra$m.z - pk$m.z > -2.5) &
+                                        (ss_MS1_spectra$m.z - pk$m.z <  4.5)  ),c('m.z','Intensity',"Isotope")]
+        MI <- pk$m.z
         
-        #Print warnings
-        if(length(mzIPdc >0)){print(paste0('Warning: mzIP discontinuity detected at mzIP = ', txt_mzIPdc))}
-        if(s.mdf$SPC<0.5){print(paste0('Warning: Spectral clarity = ',round(s.mdf$SPC,2)))}
+        s.mdf <- mzSpec_MDFilter2(spectrum=s.unk[,1:2], Q1 = MI, mdTol=ppmTol*2.8, z=1, 
+                                  splot=F, minIntN = 0, forceQ1=T, labelBG=F, plotBG=F)  # Deconvolute spectrum
+        # s.mdf$Plot
+        if(nrow(s.mdf$Spectrum)>1){
+          s.cln <- s.mdf$Spectrum[which(s.mdf$Spectrum$Class=='_Target' & s.mdf$Spectrum$mzIP>=0),c('mz','Int','Int_N','mzIP')]
+          # s.cln <- merge(s.cln, aggregate(Int_N ~ round(mzIP), s.cln, FUN=max) )
+          MIexp_deDup_Index<-which(abs(s.cln$mz-MI)==min(abs(s.cln$mz-MI))) #find the index closest to MI (molecular ion from feature table m/z)
+          s.cln <- s.cln[c(MIexp_deDup_Index,which(s.cln$mzIP!=0)),] #take the spectra of the closest to MI, and all else (non-molecular peaks)
+          s.cln <- s.cln[order(s.cln$mzIP),c('mz','Int','Int_N','mzIP')]
+          s.cln <- s.cln[!duplicated(s.cln[,c('Int_N','mzIP')]),]
+        }else{s.cln <- data.frame()}
+        n_mz <- nrow(s.cln)
         
-        nMFs.st <- Sys.time()
-        
-        ## Generate MF using spectrum to support element isotope pattern
-        MFList1 <- SpectrumToMFList2(s.unk = s.cln, Q1ref=MI, q = -1, eList1 = eList1, ppm=ppmTol - MI/100, maxCounts = F)
-        if(MI <= 800){
-          MFList2 <- SpectrumToMFList2(s.unk = s.cln, Q1ref=MI, q = -1, eList1 = eList2, ppm=ppmTol, maxCounts = F) 
-          MFList <- rbind(MFList1,MFList2)
-          rm(MFList1,MFList2) #Trash
-        }else{ MFList <- MFList1}
-        
-        if(length(MFList)==0) {MFList <- NULL} else if (nrow(MFList)==0) {MFList <- NULL}
-        
-        # Deduplication, Senior Filter, NRule Filter
-        while(!is.null(MFList) && MFEscape==F){
-          MFList <- MFList[!duplicated(MFList$MF),]  #remove duplicates
-          numMFs <- nrow(MFList)
+        # Preprocessing - Check for spectral fidelity issues, mzIP = 1 position 
+        if(n_mz>1){
+          # check for spectral discontinuity
+          mzIPdc <- which(diff(s.cln$mzIP) != 1)  # removed +1
+          txt_mzIPdc <- paste0(mzIPdc, collapse = ',')
           
-          # Logic for choosing Senior3 cutoff
-          filt.Senior <-  round(MI/20) #default
-          idx_Senior <- which(MFList$SENIOR3 <= filt.Senior & MFList$SENIOR3>=0)
-          if(length(idx_Senior)>0){
-            MFList <- MFList[idx_Senior,]  #pre-filter so you don't NRule validate Junk based on Senior's Rule
+          if(any(s.cln$Int_N[s.cln$mzIP==2] < 80 & s.cln$mzIP>2 & mzIPdc>2 & s.cln$Int_N>80)){
+            s.cln <- s.cln[-which(s.cln$mzIP>2 & s.cln$Int_N>80),]
           }
           
-          MFList <- MFnRuleValidate(MFList, Type=1)  # Only Validate MFs for nitrogen rule on charged species
-          MFList <- MFList[which(MFList$nrule=='Valid'),]  #Apply NRule
-          MFEscape <- T
-        }
-        MFEscape <- F #reset
+          #Method 2 - % RSD in spectra is high > 1
+          s.RSD <- sd(s.cln$Int_N)/mean(s.cln$Int_N)
+          if(s.RSD < 0.9 & MI < 800){decIso <- F}
+          
+          #Method 3 - mzIP position 1 intensity must make sense for mz(MI)
+          M1Cutoff <- MI/(12*0.9259)+30
+          idx_mzIP1 <- s.cln$mzIP %in% 1
+          if(any(idx_mzIP1)){
+            if(any(s.cln$Int_N[idx_mzIP1] > M1Cutoff)){
+              paste0(ft.comment,'| Noisy spectrum ')
+              decIso <- F
+            }
+          }
+        }else # switch off deciso if M+1 position does not make sense
+        {
+          ft.comment <- paste0(ft.comment,'| Single mz spectrum ')
+          decIso <- F
+          MFSolved <- F
+          txt_mzIPdc <- NA
+        } #switch off decIso
         
-        # Continue to filter using elemental heuristics, and scoring
-        if(!is.null(MFList)){
+        
+        ## Ideal case where n of mzs at least two
+        if(n_mz > 1 && decIso==T){
+          #####-----------------------------------------------------------------------------------
+          ### DeNovo MF List generation from mass spectrum decomposition
           
-          ## Heuristic based on literature
-          ## https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-105/tables/2
-          MFList <- MFList[which(  (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
-                                     (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
-                                     (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
-                                     (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
-                                     (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
-                                     (MFList$OCS <= 1 | is.na(MFList$OCS)) &
-                                     (MFList$PtoC <= 0.3 | is.na(MFList$PtoC)) &  #Exception
-                                     (MFList$StoC <=3 | is.na(MFList$StoC)) &
-                                     (MFList$OStoP <= 3 | is.na(MFList$OStoP))
-          ),]   # Keep only non-Invalids
+          # Check MI Mass
+          if(MI != s.cln$mz[s.cln$mzIP==0]){
+            MI <- s.cln$mz[s.cln$mzIP==0]
+            ft.comment <- paste0(ft.comment, '| MI Updated ')
+          }
           
-          ## Use 99.7% heuristics if MFList is large
-          if(nrow(MFList)>2000){
-            MFList <- MFList[which(  (MFList$HFClBrItoC <= 3.1 | is.na(MFList$HFClBrItoC)) & 
-                                       (MFList$HFClBrItoC >= 0.2 | is.na(MFList$HFClBrItoC)) & 
-                                       (MFList$FtoC <= 3.5 | is.na(MFList$FtoC)) &   ## Modified 99.7%
-                                       (MFList$CltoC <= 0.8 | is.na(MFList$CltoC)) &
+          #Print warnings
+          if(length(mzIPdc >0)){print(paste0('Warning: mzIP discontinuity detected at mzIP = ', txt_mzIPdc))}
+          if(s.mdf$SPC<0.5){print(paste0('Warning: Spectral clarity = ',round(s.mdf$SPC,2)))}
+          
+          nMFs.st <- Sys.time()
+          
+          ## Generate MF using spectrum to support element isotope pattern
+          MFList1 <- SpectrumToMFList2(s.unk = s.cln, Q1ref=MI, q, eList1 = eList1, ppm=ppmTol - MI/100, maxCounts = F)
+          if(MI <= 800){
+            MFList2 <- SpectrumToMFList2(s.unk = s.cln, Q1ref=MI, q, eList1 = eList2, ppm=ppmTol, maxCounts = F) 
+            MFList <- rbind(MFList1,MFList2)
+            rm(MFList1,MFList2) #Trash
+          }else{ MFList <- MFList1}
+          
+          if(length(MFList)==0) {MFList <- NULL} else if (nrow(MFList)==0) {MFList <- NULL}
+          
+          # Deduplication, Senior Filter, NRule Filter
+          while(!is.null(MFList) && MFEscape==F){
+            MFList <- MFList[!duplicated(MFList$MF),]  #remove duplicates
+            numMFs <- nrow(MFList)
+            
+            # Logic for choosing Senior3 cutoff
+            filt.Senior <-  round(MI/20) #default
+            idx_Senior <- which(MFList$SENIOR3 <= filt.Senior & MFList$SENIOR3>=0)
+            if(length(idx_Senior)>0){
+              MFList <- MFList[idx_Senior,]  #pre-filter so you don't NRule validate Junk based on Senior's Rule
+            }
+            
+            MFList <- MFnRuleValidate(MFList, Type=1)  # Only Validate MFs for nitrogen rule on charged species
+            MFList <- MFList[which(MFList$nrule=='Valid'),]  #Apply NRule
+            MFEscape <- T
+          }
+          MFEscape <- F #reset
+          
+          # Continue to filter using elemental heuristics, and scoring
+          if(!is.null(MFList)){
+            
+            ## Heuristic based on literature
+            ## https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-105/tables/2
+            MFList <- MFList[which(  (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
+                                       (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
+                                       (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
                                        (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
                                        (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
                                        (MFList$OCS <= 1 | is.na(MFList$OCS)) &
-                                       (MFList$PtoC <= 0.15 | is.na(MFList$PtoC)) & 
-                                       (MFList$StoC <=0.8 | is.na(MFList$StoC)) &
-                                       (MFList$OStoP <= 0.7 | is.na(MFList$OStoP))
-            ),] } # Higher filter if n_MFs > 100
-          
-          
-          ##----------------------------------------------- 
-          #### Cycle through MFList and score results
-          # Revisit this (sorted??)
-          n.MFs.to.score <- min(nrow(MFList), 50) #Choose how many MFs to calculate scores
-          numMFs <- n.MFs.to.score
-          if(n.MFs.to.score>0){
+                                       (MFList$PtoC <= 0.3 | is.na(MFList$PtoC)) &  #Exception
+                                       (MFList$StoC <=3 | is.na(MFList$StoC)) &
+                                       (MFList$OStoP <= 3 | is.na(MFList$OStoP))
+            ),]   # Keep only non-Invalids
             
-            ft.FormulaMatches <- data.frame()
-            for(mf in 1:n.MFs.to.score){
-              ft.comment <- ''
+            ## Use 99.7% heuristics if MFList is large
+            if(nrow(MFList)>2000){
+              MFList <- MFList[which(  (MFList$HFClBrItoC <= 3.1 | is.na(MFList$HFClBrItoC)) & 
+                                         (MFList$HFClBrItoC >= 0.2 | is.na(MFList$HFClBrItoC)) & 
+                                         (MFList$FtoC <= 3.5 | is.na(MFList$FtoC)) &   ## Modified 99.7%
+                                         (MFList$CltoC <= 0.8 | is.na(MFList$CltoC)) &
+                                         (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
+                                         (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
+                                         (MFList$OCS <= 1 | is.na(MFList$OCS)) &
+                                         (MFList$PtoC <= 0.15 | is.na(MFList$PtoC)) & 
+                                         (MFList$StoC <=0.8 | is.na(MFList$StoC)) &
+                                         (MFList$OStoP <= 0.7 | is.na(MFList$OStoP))
+              ),] } # Higher filter if n_MFs > 100
+            
+            
+            ##----------------------------------------------- 
+            #### Cycle through MFList and score results
+            # Revisit this (sorted??)
+            n.MFs.to.score <- min(nrow(MFList), 50) #Choose how many MFs to calculate scores
+            numMFs <- n.MFs.to.score
+            if(n.MFs.to.score>0){
               
-              s <- s.cln
-              # Setup Reference Mass Spectrum
-              if(is.na(ft$Adduct) || ft$Adduct==''){RefIon='[M-H]-'}else{RefIon=ft$Adduct}
-              ion_op <- merge(RefIon, adducts, by.x='x', by='Adduct')[,c('a','d')]
-              MF.ion <- ionizeMF(m=MFList$MF[mf], a=ion_op$a, d=ion_op$d)
-              
-              #if(mf<=MF_topN){topNplot=T}else{topNplot=F}
-              
-              if(!is.na(MF.ion$Mion)){
-                # Generate Ref Spec
-                # MF.ion$Mion <- 'C18H33O2'
-                s.ref <- MFtoSpectrum(formula=MF.ion$Mion, q=q, Res=F, ppmTol, patOnly=T)
-                colnames(s.ref) <- c('mz','Int')  #rename columns
-                s.ref <- cbind(s.ref, mzIP=round(s.ref$mz - s.ref$mz[1])) #Sets mzIP 
-                s.ref <- merge(aggregate(Int ~ mzIP, s.ref, FUN=max), s.ref)
-                s.ref <- s.ref[,c('mz','Int','mzIP')]
+              ft.FormulaMatches <- data.frame()
+              for(mf in 1:n.MFs.to.score){
+                ft.comment <- ''
                 
+                s <- s.cln
+                # Setup Reference Mass Spectrum
+                if(is.na(ft$Adduct) || ft$Adduct==''){RefIon=adducts[1,1]}else{RefIon=ft$Adduct}
+                ion_op <- merge(RefIon, adducts, by.x='x', by='Adduct')[,c('a','d')]
+                MF.ion <- ionizeMF(m=MFList$MF[mf], a=ion_op$a, d=ion_op$d)
                 
-                s.unk.ol <- s.cln[which(s.cln$mz > (min(s.ref$mz)-0.1) & s.cln$mz < (max(s.ref$mz)+0.1)),] #Later need to refine spectrum for charge
-                # s.unk.ol$Int_N <- 100*s.unk.ol$Int_N/max(s.unk.ol$Int_N)
+                #if(mf<=MF_topN){topNplot=T}else{topNplot=F}
                 
-                #Check overlap extent.  Is spec "close enough" to compare
-                idx_rows <- 1:min(nrow(s.unk.ol),nrow(s.ref))
-                check.ppm <- length(which(abs(s.unk.ol[idx_rows,'mz'] - s.ref[idx_rows,'mz'])*1e6/MI < ppmTol*2)) == min(nrow(s.unk.ol),nrow(s.ref))
-                
-                checkOL <- abs(s.ref$mz[s.ref$mzIP==0] - s.unk.ol$mz[s.unk.ol$mzIP==0])
-                
-                if(check.ppm == T || (checkOL[1] < 1) && (checkOL[1] > 0)){ 
-                  #SPS <- SpectrumSimilarity_custom(s.ref, s.unk.ol, dppm=ppmTol*z*2, b = 0.1, int.prec=2,
-                  #                                 bottom.label = paste0(round(pk$m.z,4),' @',round(ft$Retention.Time, 2),' min'), 
-                  #                                 top.label = paste('Simulated',MF.ion$Mion,Poltxt), 
-                  #                                 xlim = c(min(s.ref$mz[which(s.ref$Int>1)])-0.2, max(s.ref$mz[which(s.ref$Int>1)])+0.2), 
-                  #                                 x.threshold = 0, print.alignment = F, print.graphic = T, output.list = T)
+                if(!is.na(MF.ion$Mion)){
+                  # Generate Ref Spec
+                  # MF.ion$Mion <- 'C18H33O2'
+                  s.ref <- MFtoSpectrum(formula=MF.ion$Mion, q=q, Res=F, ppmTol, patOnly=T)
+                  colnames(s.ref) <- c('mz','Int')  #rename columns
+                  s.ref <- cbind(s.ref, mzIP=round(s.ref$mz - s.ref$mz[1])) #Sets mzIP 
+                  s.ref <- merge(aggregate(Int ~ mzIP, s.ref, FUN=max), s.ref)
+                  s.ref <- s.ref[,c('mz','Int','mzIP')]
                   
                   
-                  ft.MFScores <- SpectrumSimilarity_custom2(obs=s.unk.ol, the=s.ref, dppm=ppmTol, int_prec = 0.3, rnd_prec = 5)
+                  s.unk.ol <- s.cln[which(s.cln$mz > (min(s.ref$mz)-0.1) & s.cln$mz < (max(s.ref$mz)+0.1)),] #Later need to refine spectrum for charge
+                  # s.unk.ol$Int_N <- 100*s.unk.ol$Int_N/max(s.unk.ol$Int_N)
                   
-                  rnf <- max(s.unk.ol$Int) #renormalization factor
-                  rpf <- nrow(ft.MFScores$Alignment)# rows per feature
-                  ft.FormulaMatches <- rbind(ft.FormulaMatches, cbind(mf, f, Feature = pk$Feature,  
-                                                                      MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
-                                                                      Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
-                                                                      PredMZ = ft.MFScores$Alignment$m_ref, PredAbundance=ft.MFScores$Alignment$i_ref*rnf,
-                                                                      File = pk$File,
-                                                                      Score1 = ft.MFScores$Score1, Score2=ft.MFScores$Score2, Comment=ft.comment) )
+                  #Check overlap extent.  Is spec "close enough" to compare
+                  idx_rows <- 1:min(nrow(s.unk.ol),nrow(s.ref))
+                  check.ppm <- length(which(abs(s.unk.ol[idx_rows,'mz'] - s.ref[idx_rows,'mz'])*1e6/MI < ppmTol*2)) == min(nrow(s.unk.ol),nrow(s.ref))
                   
+                  checkOL <- abs(s.ref$mz[s.ref$mzIP==0] - s.unk.ol$mz[s.unk.ol$mzIP==0])
+                  
+                  if(check.ppm == T || (checkOL[1] < 1) && (checkOL[1] > 0)){ 
+                    #SPS <- SpectrumSimilarity_custom(s.ref, s.unk.ol, dppm=ppmTol*z*2, b = 0.1, int.prec=2,
+                    #                                 bottom.label = paste0(round(pk$m.z,4),' @',round(ft$Retention.Time, 2),' min'), 
+                    #                                 top.label = paste('Simulated',MF.ion$Mion,Poltxt), 
+                    #                                 xlim = c(min(s.ref$mz[which(s.ref$Int>1)])-0.2, max(s.ref$mz[which(s.ref$Int>1)])+0.2), 
+                    #                                 x.threshold = 0, print.alignment = F, print.graphic = T, output.list = T)
+                    
+                    
+                    ft.MFScores <- SpectrumSimilarity_custom2(obs=s.unk.ol, the=s.ref, dppm=ppmTol, int_prec = 0.3, rnd_prec = 5)
+                    
+                    rnf <- max(s.unk.ol$Int) #renormalization factor
+                    rpf <- nrow(ft.MFScores$Alignment)# rows per feature
+                    ft.FormulaMatches <- rbind(ft.FormulaMatches, cbind(mf, f, Feature = pk$Feature,  
+                                                                        MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
+                                                                        Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
+                                                                        PredMZ = ft.MFScores$Alignment$m_ref, PredAbundance=ft.MFScores$Alignment$i_ref*rnf,
+                                                                        File = pk$File,
+                                                                        Score1 = ft.MFScores$Score1, Score2=ft.MFScores$Score2, Comment=ft.comment) )
+                    
+                  }else{
+                    ft.comment <- paste0(ft.comment,'| Spectrum did not overlap Ref ')
+                    ft.FormulaMatches <- rbind(ft.FormulaMatches, cbind(mf, f, Feature = pk$Feature,  
+                                                                        MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
+                                                                        Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
+                                                                        PredMZ = NA, PredAbundance=NA,
+                                                                        File = pk$File,
+                                                                        Score1 = '0', Score2='0', Comment=ft.comment) )
+                  } ## If overlap not present
                 }else{
-                  ft.comment <- paste0(ft.comment,'| Spectrum did not overlap Ref ')
+                  ft.comment <- paste0(ft.comment,'| Cannot ionize MF ')
                   ft.FormulaMatches <- rbind(ft.FormulaMatches, cbind(mf, f, Feature = pk$Feature,  
                                                                       MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
-                                                                      Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=MF.ion$Mion,
+                                                                      Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=NA,
                                                                       PredMZ = NA, PredAbundance=NA,
                                                                       File = pk$File,
                                                                       Score1 = '0', Score2='0', Comment=ft.comment) )
-                } ## If overlap not present
-              }else{
-                ft.comment <- paste0(ft.comment,'| Cannot ionize MF ')
-                ft.FormulaMatches <- rbind(ft.FormulaMatches, cbind(mf, f, Feature = pk$Feature,  
-                                                                    MZ = ft.MFScores$Alignment$m_obs, Abundance=ft.MFScores$Alignment$i_obs*rnf,
-                                                                    Isotope = seq(1:rpf), Formula = MF.ion$MFinput, zFormula=NA,
-                                                                    PredMZ = NA, PredAbundance=NA,
-                                                                    File = pk$File,
-                                                                    Score1 = '0', Score2='0', Comment=ft.comment) )
-              }  ## If Ionization failed
-            } # end for loop
+                }  ## If Ionization failed
+              } # end for loop
+              
+              #Add 10% penalty for Phosphorus
+              idx_MFs_P <- which(grepl('P',ft.FormulaMatches$Formula))
+              if(any(idx_MFs_P)){ft.FormulaMatches$Score2[idx_MFs_P] <- as.numeric(ft.FormulaMatches$Score2[idx_MFs_P]) * 0.9 }
+              
+              ft.FormulaMatches <- ft.FormulaMatches[order(-as.numeric(ft.FormulaMatches$Score2)),]
+              ## Re-rank based on Score2
+              ft.FormulaMatches <- merge(ft.FormulaMatches, data.frame(mf=unique(ft.FormulaMatches$mf), 
+                                                                       Rank=seq(1:mf)), by='mf')
+              #Keep TopN only
+              ft.FormulaMatches <- ft.FormulaMatches[ft.FormulaMatches$Rank<=MF_topN, ]
+              ft.FormulaMatches <- ft.FormulaMatches[order(ft.FormulaMatches$Rank),]
+              
+              nMFs.et <- Sys.time()
+              nMFs.tt <- round(as.numeric (nMFs.et - nMFs.st, units = "secs"), 1)
+              MFSolved <- T
+              
+            }else{
+              ft.comment <- paste0(ft.comment,'| No valid MFs found for spectrum ')
+              decIso <- F # Try decomposeMass
+              MFSolved <- F
+            }
             
-            #Add 10% penalty for Phosphorus
-            idx_MFs_P <- which(grepl('P',ft.FormulaMatches$Formula))
-            if(any(idx_MFs_P)){ft.FormulaMatches$Score2[idx_MFs_P] <- as.numeric(ft.FormulaMatches$Score2[idx_MFs_P]) * 0.9 }
+          }else{
+            ft.comment <- paste0(ft.comment,'| Unable to predict MF on spectrum ')
+            decIso <- F # Try decomposeMass
+            MFSolved <- F
+          } #end if nSP >=1
+        } #end decompose isotopes
+        
+        ## If there is only 1 mz or decIso got switched to false, we can only do decompose Mass
+        if((n_mz==1 || decIso==F) && MFSolved==F){
+          
+          nMFs.st <- Sys.time()
+          # Case where only 1 mz peak - Can't have Br or Cl
+          if(n_mz==1){
+            eList_t <- eList1[-which(eList1=='Br' | eList1=='Cl')]
+          }else{
+            eList_t <- eList1
+          }
+          
+          #Predict MF on neutral, single mz
+          MFList <- calcMF2(mz = MI + q*5.48579909070e-4 - q*1.00783, z = 0, ppm = ppmTol, top = NULL, elements = c(Rdisop::initializeElements(eList_t)), maxCounts = F,
+                            SeniorRule = T, HCratio = T, moreRatios = T, elementHeuristic = T, 
+                            Filters = list(maxCounts =F, SENIOR3 = F, HCratio = F, 
+                                           moreRatios = F, elementHeuristic = F), summarize = F, BPPARAM = NULL)
+          
+          filt.Senior <-  round(MI/20) #default
+          idx_Senior <- which(MFList$SENIOR3 <= filt.Senior & MFList$SENIOR3>=0)
+          #pre-filter so you don't NRule validate Junk based on Senior's Rule
+          if(length(idx_Senior)>0){MFList <- MFList[idx_Senior,]}
+          
+          #Apply Filter BEFORE NRule Validate
+          MFList <- MFList[which( MFList$SENIOR3 < filt.Senior & MFList$SENIOR3 >= 0 & MFList$unsat > -10 &
+                                    (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
+                                    (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
+                                    (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
+                                    (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
+                                    (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
+                                    (MFList$OCS <= 1 | is.na(MFList$OCS)) &
+                                    (MFList$PtoC <= 2 | is.na(MFList$PtoC)) & 
+                                    (MFList$StoC <=3 | is.na(MFList$StoC)) &
+                                    (MFList$OStoP <= 3 | is.na(MFList$OStoP))
+          ),] 
+          
+          if(!is.null(MFList) && nrow(MFList)>0){
+            MFList <- MFnRuleValidate(MFList, Type=1) 
+            MFList <- MFList[which(MFList$nrule=='Valid'),]
+          }
+          
+          while((!is.null(MFList) && nrow(MFList)>0) && MFEscape==F){
             
-            ft.FormulaMatches <- ft.FormulaMatches[order(-as.numeric(ft.FormulaMatches$Score2)),]
-            ## Re-rank based on Score2
-            ft.FormulaMatches <- merge(ft.FormulaMatches, data.frame(mf=unique(ft.FormulaMatches$mf), 
-                                                                     Rank=seq(1:mf)), by='mf')
-            #Keep TopN only
-            ft.FormulaMatches <- ft.FormulaMatches[ft.FormulaMatches$Rank<=MF_topN, ]
-            ft.FormulaMatches <- ft.FormulaMatches[order(ft.FormulaMatches$Rank),]
+            #Simple heuristic to choose MF with RDBE closest to 0, take first one(lowest ppm) if two exist
+            MFList <- MFList[order(abs(MFList$unsat), abs(MFList$ppm)),]
+            numMFs <- nrow(MFList) # Get this number before storing TopN
+            
+            #Final MFList
+            MFList <- MFList[1:(min(MF_topN,numMFs)),]
+            
+            #Get MF ion formulas
+            ion_op <- merge(RefIon, adducts, by.x='x', by.y='Adduct')[,c('a','d')]
+            MF.ion <- lapply(X=MFList$MF, FUN=ionizeMF,  a=ion_op$a, d=ion_op$d)
+            MF.ion <- as.data.frame(t(do.call(cbind, MF.ion)))
             
             nMFs.et <- Sys.time()
             nMFs.tt <- round(as.numeric (nMFs.et - nMFs.st, units = "secs"), 1)
+            MFEscape <- T
+          }
+          MFEscape <- F #reset
+          
+          
+          # Basic final score assigned only on mass error and if present
+          if(!is.null(MFList) && nrow(MFList)>0){
+            mzScore <- 1 - abs(MFList$ppm)/ppmTol
             MFSolved <- T
-            
-          }else{
-            ft.comment <- paste0(ft.comment,'| No valid MFs found for spectrum ')
-            decIso <- F # Try decomposeMass
+            ft.FormulaMatches <- data.frame(mf = seq(1:nrow(MFList)), f, Feature = ft$row.ID, 
+                                            MZ = s.cln[1,'mz'], Abundance=s.cln[1,'Int'],
+                                            Isotope = 1, Formula = MFList$MF, zFormula=unlist(MF.ion$Mion),
+                                            PredMZ = MFList$mz, PredAbundance=s.cln[1,'Int'],
+                                            File = pk$File,Score1 = 0, Score2=mzScore, 
+                                            Comment=ft.comment, Rank = seq(1:nrow(MFList)))
+          }else{ #end final score and store of mz=1
+            ft.comment <- 'No MF from spectrum or single mz'
             MFSolved <- F
           }
           
-        }else{
-          ft.comment <- paste0(ft.comment,'| Unable to predict MF on spectrum ')
-          decIso <- F # Try decomposeMass
-          MFSolved <- F
-        } #end if nSP >=1
-      } #end decompose isotopes
-      
-      ## If there is only 1 mz or decIso got switched to false, we can only do decompose Mass
-      if((n_mz==1 || decIso==F) && MFSolved==F){
+        }# End if 1 mz value in spec
         
-        nMFs.st <- Sys.time()
-        # Case where only 1 mz peak - Can't have Br or Cl
-        if(n_mz==1){
-          eList_t <- eList1[-which(eList1=='Br' | eList1=='Cl')]
-        }else{
-          eList_t <- eList1
+      }else{ #End Feature in Master table present
+        MFSolved <- F
+        
+        if(nrow(ft)==0){ft.comment <- 'Spectrum not linked to a feature'}
+        if(pk$m.z > 1000){ft.comment <- 'High mz MF not predicted'}
+      } #else no spectrum found
+      
+      
+      # Write MFList based on variables
+      if(MFSolved==T){
+        
+        dn.FormulaMatches <- rbind(dn.FormulaMatches, ft.FormulaMatches)
+        
+        if(mf.stor==T){
+          idx_ft_toprow <- which(ft.FormulaMatches$Isotope==1)
+          pks_MS1_MF <- rbind(pks_MS1_MF, cbind(Feature=pk$Feature, Src='DN', MF=ft.FormulaMatches$Formula[idx_ft_toprow], MFscore=ft.FormulaMatches$Score2[idx_ft_toprow], MFRank=ft.FormulaMatches$Rank[idx_ft_toprow], nMFs=numMFs))
+          pks_Top_MFs <- rbind(pks_Top_MFs, data.frame(Feature=pk$Feature, TopMF=ft.FormulaMatches$Formula[1], TopMFScore=ft.FormulaMatches$Score2[1],  SPC=s.mdf$SPC, numMFs, nMFs.tt, mzIPdc=txt_mzIPdc) )
         }
-        
-        #Predict MF on neutral, single mz
-        MFList <- calcMF2(mz = MI + q*5.48579909070e-4 - q*1.007276, z = 0, ppm = ppmTol, top = NULL, elements = c(Rdisop::initializeElements(eList_t)), maxCounts = F,
-                          SeniorRule = T, HCratio = T, moreRatios = T, elementHeuristic = T, 
-                          Filters = list(maxCounts =F, SENIOR3 = F, HCratio = F, 
-                                         moreRatios = F, elementHeuristic = F), summarize = F, BPPARAM = NULL)
-        
-        filt.Senior <-  round(MI/20) #default
-        idx_Senior <- which(MFList$SENIOR3 <= filt.Senior & MFList$SENIOR3>=0)
-        #pre-filter so you don't NRule validate Junk based on Senior's Rule
-        if(length(idx_Senior)>0){MFList <- MFList[idx_Senior,]}
-        
-        #Apply Filter BEFORE NRule Validate
-        MFList <- MFList[which( MFList$SENIOR3 < filt.Senior & MFList$SENIOR3 >= 0 & MFList$unsat > -10 &
-                                  (MFList$HFClBrItoC <= 6 | is.na(MFList$HFClBrItoC)) & 
-                                  (MFList$FtoC <= 6 | is.na(MFList$FtoC)) &
-                                  (MFList$CltoC <= 2 | is.na(MFList$CltoC)) &
-                                  (MFList$NtoC <= 0.5 | is.na(MFList$NtoC)) &
-                                  (MFList$OtoC <= 1 | is.na(MFList$OtoC) | is.na(MFList$OCS)) &
-                                  (MFList$OCS <= 1 | is.na(MFList$OCS)) &
-                                  (MFList$PtoC <= 2 | is.na(MFList$PtoC)) & 
-                                  (MFList$StoC <=3 | is.na(MFList$StoC)) &
-                                  (MFList$OStoP <= 3 | is.na(MFList$OStoP))
-        ),] 
-        
-        if(!is.null(MFList) && nrow(MFList)>0){
-          MFList <- MFnRuleValidate(MFList, Type=1) 
-          MFList <- MFList[which(MFList$nrule=='Valid'),]
-        }
-        
-        while((!is.null(MFList) && nrow(MFList)>0) && MFEscape==F){
-          
-          #Simple heuristic to choose MF with RDBE closest to 0, take first one(lowest ppm) if two exist
-          MFList <- MFList[order(abs(MFList$unsat), abs(MFList$ppm)),]
-          numMFs <- nrow(MFList) # Get this number before storing TopN
-          
-          #Final MFList
-          MFList <- MFList[1:(min(MF_topN,numMFs)),]
-          
-          #Get MF ion formulas
-          ion_op <- merge(RefIon, adducts, by.x='x', by.y='Adduct')[,c('a','d')]
-          MF.ion <- lapply(X=MFList$MF, FUN=ionizeMF,  a=ion_op$a, d=ion_op$d)
-          MF.ion <- as.data.frame(t(do.call(cbind, MF.ion)))
-          
-          nMFs.et <- Sys.time()
-          nMFs.tt <- round(as.numeric (nMFs.et - nMFs.st, units = "secs"), 1)
-          MFEscape <- T
-        }
-        MFEscape <- F #reset
-        
-        
-        # Basic final score assigned only on mass error and if present
-        if(!is.null(MFList) && nrow(MFList)>0){
-          mzScore <- 1 - abs(MFList$ppm)/ppmTol
-          MFSolved <- T
-          ft.FormulaMatches <- data.frame(mf = seq(1:nrow(MFList)), f, Feature = ft$row.ID, 
-                                          MZ = s.cln[1,'mz'], Abundance=s.cln[1,'Int'],
-                                          Isotope = 1, Formula = MFList$MF, zFormula=unlist(MF.ion$Mion),
-                                          PredMZ = MFList$mz, PredAbundance=s.cln[1,'Int'],
-                                          File = pk$File,Score1 = 0, Score2=mzScore, 
-                                          Comment=ft.comment, Rank = seq(1:nrow(MFList)))
-        }else{ #end final score and store of mz=1
-          ft.comment <- 'No MF from spectrum or single mz'
-          MFSolved <- F
-        }
-        
-      }# End if 1 mz value in spec
-      
-    }else{ #End Feature in Master table present
-      MFSolved <- F
-      
-      if(nrow(ft)==0){ft.comment <- 'Spectrum not linked to a feature'}
-      if(pk$m.z > 1000){ft.comment <- 'High mz MF not predicted'}
-    } #else no spectrum found
-    
-    
-    # Write MFList based on variables
-    if(MFSolved==T){
-      
-      dn.FormulaMatches <- rbind(dn.FormulaMatches, ft.FormulaMatches)
-      
-      if(mf.stor==T){
-        idx_ft_toprow <- which(ft.FormulaMatches$Isotope==1)
-        pks_MS1_MF <- rbind(pks_MS1_MF, cbind(Feature=pk$Feature, Src='DN', MF=ft.FormulaMatches$Formula[idx_ft_toprow], MFscore=ft.FormulaMatches$Score2[idx_ft_toprow], MFRank=ft.FormulaMatches$Rank[idx_ft_toprow], nMFs=numMFs))
-        pks_Top_MFs <- rbind(pks_Top_MFs, data.frame(Feature=pk$Feature, TopMF=ft.FormulaMatches$Formula[1], TopMFScore=ft.FormulaMatches$Score2[1],  SPC=s.mdf$SPC, numMFs, nMFs.tt, mzIPdc=txt_mzIPdc) )
       }
-    }
-    
-    if(MFSolved==F){
-      dn.FormulaMatches <- rbind(dn.FormulaMatches, cbind(mf=NA, f, Feature = ft$row.ID, 
-                                                          MZ = ft$m.z, Abundance=NA, 
-                                                          Isotope=NA, Formula = NA, zFormula=NA,
-                                                          PredMZ=NA, PredAbundance = NA, File=ft$Files.1[1],
-                                                          Score1=NA, Score2=NA, Comment=ft.comment, Rank=NA) ) 
       
-      if(mf.stor==T){
-        pks_MS1_MF <- rbind(pks_MS1_MF, data.frame(Feature=pk$Feature, Src='DN', MF=NA, MFscore=NA, MFRank=NA, nMFs=0 ))
-        pks_Top_MFs <- rbind(pks_Top_MFs, data.frame(Feature=pk$Feature, TopMF=NA, TopMFScore=NA,  SPC=s.mdf$SPC, numMFs=0, nMFs.tt=NA,mzIPdc=txt_mzIPdc) )
-      } 
-    }
+      if(MFSolved==F){
+        dn.FormulaMatches <- rbind(dn.FormulaMatches, cbind(mf=NA, f, Feature = ft$row.ID, 
+                                                            MZ = ft$m.z, Abundance=NA, 
+                                                            Isotope=NA, Formula = NA, zFormula=NA,
+                                                            PredMZ=NA, PredAbundance = NA, File=ft$Files.1[1],
+                                                            Score1=NA, Score2=NA, Comment=ft.comment, Rank=NA) ) 
+        
+        if(mf.stor==T){
+          pks_MS1_MF <- rbind(pks_MS1_MF, data.frame(Feature=pk$Feature, Src='DN', MF=NA, MFscore=NA, MFRank=NA, nMFs=0 ))
+          pks_Top_MFs <- rbind(pks_Top_MFs, data.frame(Feature=pk$Feature, TopMF=NA, TopMFScore=NA,  SPC=s.mdf$SPC, numMFs=0, nMFs.tt=NA,mzIPdc=txt_mzIPdc) )
+        } 
+      }
+    }, error=function(e){cat("This feature could not get a predicted formula (errored) but continuing; description of the error:",conditionMessage(e), "\n")})
   } #end Feature List cycle
   
   
@@ -1673,7 +1686,7 @@ mzIPidx_Max <- function(spec, Q1_dist, mzIP, minInt=0){  #Gets max Int pos for g
   return(idx_mzIP)
 }
 
-
+#observed (obs) and Theoretical (the) Spectrum
 SpectrumSimilarity_custom2 <- function (obs = NULL, the = NULL, dppm = 2, int_prec = 0.3, 
                                         limit = 0, rnd_prec = 5) 
 {
@@ -1697,15 +1710,24 @@ SpectrumSimilarity_custom2 <- function (obs = NULL, the = NULL, dppm = 2, int_pr
     }
   }
   
-  ## Mass residuals relative to mass error tolerance
+  ## Mass residuals (difference between theoretical and observed) 
+  ## relative to mass error tolerance (ppm tolerance turned into a Da using the mass)
   max_err_mz <- dppm * spec_align[,1]/10^6
   dmz <- 1 - abs(spec_align[,3] - spec_align[,1])/max_err_mz
   dmz[dmz > 1] <- 1
   
+  ##mass ppm errors
+  # mz.ppmerror <- (spec_align[,3] - spec_align[,1])*1e6/spec_align[,1]
+  
   ## Intensity residuals relative to Intensity tolerance
+  ## Note this normalization as above helps penalize things that don't fall within expected tolerances, 
+  ## note that 30% as the default may be off base for certain instruments
   max_err_int <- int_prec * spec_align[,2]
   dint <- 1 -  (abs(spec_align[,4] - spec_align[,2]))/max_err_int
   dint[dint > 1] <- 1
+  
+  ##intensity percent differences
+  # int.RSD = spec_align[,4] / spec_align[,2] - 1
   
   ## Dot-product calculations
   u.m <- spec_align[,1]/max_err_mz
@@ -1716,7 +1738,7 @@ SpectrumSimilarity_custom2 <- function (obs = NULL, the = NULL, dppm = 2, int_pr
   out.m <- 1 - (1 - as.vector((u.m %*% v.m)/(sqrt(sum(u.m^2)) * sqrt(sum(v.m^2)))))*1e6
   out.i <- as.vector((u.i %*% v.i)/(sqrt(sum(u.i^2)) * sqrt(sum(v.i^2))))
   
-  score1 <- weighted.mean(c(out.m,out.i),w=c(1,0)) #equal weighted
+  score1 <- weighted.mean(c(out.m,out.i),w=c(1,0)) #mz only weighted
   score2 <- weighted.mean(c(out.m,out.i),w=c(0,1)) #int only weighted
   score3 <- ( max(0,weighted.mean(dmz,spec_align[,2])) + max(0,weighted.mean(dint,spec_align[,2]))  )/2
   #old method
