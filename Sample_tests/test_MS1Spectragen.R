@@ -2,24 +2,25 @@
 source(paste("","../Scripts/EIC_MS1_fns.R",   sep=""))
 source(paste("","../Scripts/genIsoTable.R",   sep=""))
 source(paste("","../Scripts/MS1Spectragen.R", sep=""))
-Rcpp::sourceCpp(paste("","../Scripts/MS1im.cpp", sep=""))
+# Rcpp::sourceCpp(paste("","../Scripts/MS1im.cpp", sep=""))
 
 test_MS1 <- function(){
     args = construct_EM_arguments(
         PrecursorMassAccuracy = 0.01
-        ,RT_Tolerances = c(0.1, 0.5)
-        ,DT_Tolerances = c(0.1, 3)
-        ,OutputDirectory = "../RapidTestModular_FM/Output"
-        ,FeatureID_Cols = c(6,7,12,4)+1 #mz, rt, rowID, formula
+        ,RT_Window =  1/6
+        ,OutputDirectory = "../RapidTestModular_FM/Output/"
+        ,FeatureID_Cols = c(6,7,12,4)+1  #mz,rt,id,formula
         ,GroupCSVDirectory = c()
         ,isostring = "13C3;N;S;Cl2;18O;Br2"
         ,isotable = "../Scripts/secondary_isotopes.csv"
-        ,isIM = FALSE
     )
     args$fn_FeatureID = "NegIDed_FIN.csv"
-    args$fn_mzxml = "AFFF3_Target_Neg.mzXML"
     args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_NEW2.csv"
-    args$path_to_mzXML_Files = "../RapidTestModular_FM/Input"
+
+    args$path_to_mzXML_Files = "../RapidTestModular_FM/Input/"
+    args$fn_mzxml = "AFFF3_Target_Neg.mzXML"
+
+    # print(args$fn_mzxml)
     extract_MS1(args)
 }
 
