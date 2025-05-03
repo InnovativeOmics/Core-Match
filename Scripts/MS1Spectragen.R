@@ -1,11 +1,33 @@
 #!/usr/bin/env Rscript
 
+get_new_MS1_index <- function(arguments, featureID, targetRT){
+    # Grab the EIC for a specific scan
+    # Grab rows within the retention time window
+    # Find index of max intensity
+    # Get/return rowname for index
+    g = arguments$EIC_data[as.character(featureID)][[1]]
+    ans = g[targetRT-arguments$rttol < g[,'RT'] 
+            & g[,'RT'] < targetRT+arguments$rttol
+            ,, drop = FALSE]
+    print(names(arguments$EIC_data))
+    print(as.character(featureID))
+    print(ans)
+    max_row_index = which.max(ans[,'Intensity'])
+    rt_at_max_intensity = ans[max_row_index,1]
+    return(rt_at_max_intensity)
+}
+
 generateMS1forFeatureID <- function(arguments, MS1s, RTs, df_FeatureID, FeatureID_row){
     # Generate the MS1 for a row of FeatureID
     mzZoomLow  = arguments$mzZoomWindowLow
     mzZoomHigh = arguments$mzZoomWindowHigh
     tmz = df_FeatureID[[1]][FeatureID_row,1]
     trt = df_FeatureID[[1]][FeatureID_row,2]
+    tid = round(df_FeatureID[[1]][FeatureID_row,3])
+    trt2 = get_new_MS1_index(arguments, tid, trt)
+    # MS1index = which.min(abs(RTs - trt))
+    if(!is.null(trt2)){ trt = trt2}
+    print(c(tmz, trt, tid, trt2))
     MS1index = which.min(abs(RTs - trt))
     df = MS1s[[MS1index]][,-c(4,5)] #remove the extra pMZ and snum columns from the shared getAllSpectras function
     MS1_Zoom = df[ tmz + mzZoomLow < df[,2]
@@ -123,6 +145,16 @@ extract_MS1 <- function( arguments ){
     if (!file.exists(arguments$fn_MS1_output_wpath)) {
         printMS1header(arguments$fn_MS1_output_wpath)
     }
+
+    # Load EICs so that we can pull the scan with the maximum intensity for the given window.
+    arguments$fn_EIC_data = file.path(arguments$path_to_output_folder, arguments$fn_EIC_output)
+    df <- data.frame( readFeatureTable(arguments$fn_EIC_data, c(1,2,3), c()) )
+    groups = split(df, df$Feature)
+    # print(groups)
+    # Group based off of feature to make it faster
+    arguments$EIC_data <- lapply(groups, function(group) {
+        as.matrix(group[, c("RT", "Intensity")])
+    })
 
     arguments$Iso = dfIsotopes(arguments)
     arguments$mzZoomWindowLow  = min(arguments$Iso[[1]]) - 5

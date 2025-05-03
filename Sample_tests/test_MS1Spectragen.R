@@ -14,12 +14,13 @@ test_MS1 <- function(){
         ,isostring = "13C3;N;S;Cl2;18O;Br2"
         ,isotable = "../Scripts/secondary_isotopes.csv"
     )
-    args$fn_FeatureID = "NegIDed_FIN.csv"
-    args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_NEW2.csv"
-
     args$path_to_mzXML_Files = "../RapidTestModular_FM/Input/"
     args$fn_mzxml = "AFFF3_Target_Neg.mzXML"
-
+    args$fn_FeatureID = "NegIDed_FIN.csv"
+    args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_AFTER.csv"
+    args$fn_EIC_output = "EXAMPLE_EIC_OUTPUT_NEW.csv"
+    args$rttol = 0.05
+    print(args$rttol)
     # print(args$fn_mzxml)
     extract_MS1(args)
 }
