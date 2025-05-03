@@ -20,8 +20,6 @@ test_MS1 <- function(){
     args$fn_MS1_output = "EXAMPLE_MS1_OUTPUT_AFTER.csv"
     args$fn_EIC_output = "EXAMPLE_EIC_OUTPUT_NEW.csv"
     args$rttol = 0.05
-    print(args$rttol)
-    # print(args$fn_mzxml)
     extract_MS1(args)
 }
 

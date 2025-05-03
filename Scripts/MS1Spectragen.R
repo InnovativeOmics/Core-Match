@@ -9,9 +9,9 @@ get_new_MS1_index <- function(arguments, featureID, targetRT){
     ans = g[targetRT-arguments$rttol < g[,'RT'] 
             & g[,'RT'] < targetRT+arguments$rttol
             ,, drop = FALSE]
-    print(names(arguments$EIC_data))
-    print(as.character(featureID))
-    print(ans)
+    # print(names(arguments$EIC_data))
+    # print(as.character(featureID))
+    # print(ans)
     max_row_index = which.max(ans[,'Intensity'])
     rt_at_max_intensity = ans[max_row_index,1]
     return(rt_at_max_intensity)
@@ -27,7 +27,7 @@ generateMS1forFeatureID <- function(arguments, MS1s, RTs, df_FeatureID, FeatureI
     trt2 = get_new_MS1_index(arguments, tid, trt)
     # MS1index = which.min(abs(RTs - trt))
     if(!is.null(trt2)){ trt = trt2}
-    print(c(tmz, trt, tid, trt2))
+    # print(c(tmz, trt, tid, trt2))
     MS1index = which.min(abs(RTs - trt))
     df = MS1s[[MS1index]][,-c(4,5)] #remove the extra pMZ and snum columns from the shared getAllSpectras function
     MS1_Zoom = df[ tmz + mzZoomLow < df[,2]
@@ -149,6 +149,7 @@ extract_MS1 <- function( arguments ){
     # Load EICs so that we can pull the scan with the maximum intensity for the given window.
     arguments$fn_EIC_data = file.path(arguments$path_to_output_folder, arguments$fn_EIC_output)
     df <- data.frame( readFeatureTable(arguments$fn_EIC_data, c(1,2,3), c()) )
+    print("Really just read EIC which should be ID,RT,Intensity")
     groups = split(df, df$Feature)
     # print(groups)
     # Group based off of feature to make it faster
